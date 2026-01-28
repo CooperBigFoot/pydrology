@@ -67,16 +67,16 @@ def list_metrics() -> list[str]:
     return sorted(METRICS.keys())
 
 
-def validate_objectives(objectives: dict[str, str]) -> None:
-    """Validate an objectives dictionary.
-
-    Checks that:
-    1. objectives is non-empty
-    2. All metric names exist in registry
-    3. Directions match registry (warns if not)
+def validate_objectives(objectives: list[str] | dict[str, str]) -> dict[str, str]:
+    """Validate and normalize objectives.
 
     Args:
-        objectives: Dict mapping metric names to directions.
+        objectives: Metric names to optimize. Can be:
+            - List of names (uses registered directions): ["nse", "log_nse"]
+            - Dict with explicit directions (for overrides): {"nse": "minimize"}
+
+    Returns:
+        Normalized dict mapping metric names to directions.
 
     Raises:
         ValueError: If objectives is empty or contains unknown metrics.
@@ -85,6 +85,19 @@ def validate_objectives(objectives: dict[str, str]) -> None:
         msg = "objectives cannot be empty"
         raise ValueError(msg)
 
+    # Normalize list to dict using registered directions
+    if isinstance(objectives, list):
+        result: dict[str, str] = {}
+        for name in objectives:
+            if name not in METRICS:
+                available = ", ".join(sorted(METRICS.keys()))
+                msg = f"Unknown metric '{name}'. Available: {available}"
+                raise ValueError(msg)
+            _, direction = METRICS[name]
+            result[name] = direction
+        return result
+
+    # Dict form - validate and warn on direction mismatch
     for name, direction in objectives.items():
         if name not in METRICS:
             available = ", ".join(sorted(METRICS.keys()))
@@ -94,8 +107,11 @@ def validate_objectives(objectives: dict[str, str]) -> None:
         _, registered_direction = METRICS[name]
         if direction != registered_direction:
             logger.warning(
-                "Metric '%s' has registered direction '%s', but you specified '%s'. This is unusual - are you sure?",
+                "Metric '%s' has registered direction '%s', but you specified '%s'. "
+                "This is unusual - are you sure?",
                 name,
                 registered_direction,
                 direction,
             )
+
+    return objectives

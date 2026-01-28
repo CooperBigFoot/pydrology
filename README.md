@@ -194,7 +194,7 @@ observed = ObservedData(
 result = calibrate(
     forcing=forcing,
     observed=observed,
-    objectives={"nse": "maximize"},
+    objectives=["nse"],
     bounds={"x1": (1, 2500), "x2": (-5, 5), "x3": (1, 1000),
             "x4": (0.5, 10), "x5": (-4, 4), "x6": (0.01, 20)},
     warmup=365,

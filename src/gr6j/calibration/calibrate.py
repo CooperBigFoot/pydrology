@@ -130,7 +130,7 @@ def _array_to_parameters(x: np.ndarray, snow: bool) -> Parameters:
 def calibrate(
     forcing: ForcingData,
     observed: ObservedData,
-    objectives: dict[str, str],
+    objectives: list[str] | dict[str, str],
     bounds: dict[str, tuple[float, float]],
     catchment: Catchment | None = None,
     snow: bool = False,
@@ -150,8 +150,9 @@ def calibrate(
     Args:
         forcing: Forcing data (precip, pet, optionally temp).
         observed: Observed streamflow for the post-warmup period.
-        objectives: Dict mapping metric names to directions.
-            Example: {"nse": "maximize"} or {"nse": "maximize", "log_nse": "maximize"}
+        objectives: Metric names to optimize. Can be:
+            - List of names (uses registered directions): ["nse", "log_nse"]
+            - Dict with explicit directions (for overrides): {"nse": "minimize"}
         bounds: Dict mapping parameter names to (lower, upper) tuples.
             Must include x1-x6, plus ctg/kf if snow=True.
         catchment: Catchment properties. Required when snow=True.
@@ -177,7 +178,7 @@ def calibrate(
         >>> result = calibrate(
         ...     forcing=forcing,
         ...     observed=observed,
-        ...     objectives={"nse": "maximize"},
+        ...     objectives=["nse"],
         ...     bounds={"x1": (1, 2500), "x2": (-5, 5), ...},
         ...     warmup=365,
         ... )
@@ -186,8 +187,8 @@ def calibrate(
     # Lazy import ctrl-freak to keep it optional at import time
     from ctrl_freak import ga, nsga2, polynomial_mutation, sbx_crossover
 
-    # Validate inputs
-    validate_objectives(objectives)
+    # Validate and normalize inputs
+    objectives_dict = validate_objectives(objectives)
     _validate_bounds(bounds, snow)
     _validate_snow_config(snow, forcing, catchment)
     _validate_warmup(warmup, len(forcing), len(observed))
@@ -203,14 +204,14 @@ def calibrate(
 
     # Get metric functions and determine if we need to negate for minimization
     # ctrl-freak always minimizes, so we negate maximization objectives
-    objective_names = list(objectives.keys())
+    objective_names = list(objectives_dict.keys())
     metric_funcs = []
     negate_flags = []
     for name in objective_names:
-        func, registered_direction = get_metric(name)
+        func, _ = get_metric(name)
         metric_funcs.append(func)
         # Negate if we want to maximize (since ctrl-freak minimizes)
-        negate_flags.append(objectives[name] == "maximize")
+        negate_flags.append(objectives_dict[name] == "maximize")
 
     # Create operators with seed for reproducibility
     crossover = sbx_crossover(eta=15.0, bounds=bounds_tuple, seed=seed)

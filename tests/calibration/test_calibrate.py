@@ -203,7 +203,7 @@ class TestCalibrate:
         result = calibrate(
             forcing=simple_forcing,
             observed=simple_observed,
-            objectives={"nse": "maximize"},
+            objectives=["nse"],
             bounds=simple_bounds,
             warmup=10,
             population_size=10,
@@ -224,7 +224,7 @@ class TestCalibrate:
         result = calibrate(
             forcing=simple_forcing,
             observed=simple_observed,
-            objectives={"nse": "maximize", "log_nse": "maximize"},
+            objectives=["nse", "log_nse"],
             bounds=simple_bounds,
             warmup=10,
             population_size=10,
@@ -287,7 +287,7 @@ class TestCalibrate:
         result = calibrate(
             forcing=forcing,
             observed=observed,
-            objectives={"nse": "maximize"},
+            objectives=["nse"],
             bounds=bounds,
             catchment=catchment,
             snow=True,
