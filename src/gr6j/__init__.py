@@ -6,6 +6,7 @@ Génie Rural à 6 paramètres Journalier.
 Includes optional CemaNeige snow module for cold-climate catchments.
 """
 
+from .calibration import ObservedData, Solution, calibrate, list_metrics
 from .cemaneige import (
     CemaNeige,
     CemaNeigeMultiLayerState,
@@ -25,12 +26,16 @@ __all__ = [
     "ForcingData",
     "GR6JOutput",
     "ModelOutput",
+    "ObservedData",
     "Parameters",
     "SnowLayerOutputs",
     "SnowOutput",
+    "Solution",
     "State",
+    "calibrate",
     "cemaneige_multi_layer_step",
     "cemaneige_step",
+    "list_metrics",
     "run",
     "step",
 ]

@@ -272,6 +272,14 @@ wheels = [
 ]
 
 [[package]]
+name = "ctrl-freak"
+version = "0.1.0"
+source = { git = "https://github.com/hydrosolutions/ctrl-freak.git?rev=main#0b0051e146fd39f0bce0b7d8e80297ba18f888b4" }
+dependencies = [
+    { name = "numpy" },
+]
+
+[[package]]
 name = "cycler"
 version = "0.12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -357,6 +365,7 @@ name = "gr6j"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "ctrl-freak" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "pydantic" },
@@ -374,6 +383,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "ctrl-freak", git = "https://github.com/hydrosolutions/ctrl-freak.git?rev=main" },
     { name = "numpy", specifier = ">=2.4.1" },
     { name = "pandas", specifier = ">=3.0.0" },
     { name = "pydantic", specifier = ">=2.0" },

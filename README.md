@@ -169,6 +169,41 @@ new_state, fluxes = step(state, params, precip=10.0, pet=3.0,
 print(f"Streamflow: {fluxes['streamflow']:.2f} mm/day")
 ```
 
+### Calibration
+
+Automatically optimize GR6J parameters using evolutionary algorithms:
+
+```python
+import numpy as np
+from gr6j import ForcingData, ObservedData, calibrate
+
+# Prepare forcing data (warmup + calibration period)
+forcing = ForcingData(
+    time=np.datetime64("2019-01-01") + np.arange(730),
+    precip=precip_data,
+    pet=pet_data,
+)
+
+# Observed streamflow (post-warmup only)
+observed = ObservedData(
+    time=forcing.time[365:],
+    streamflow=observed_streamflow,
+)
+
+# Calibrate to maximize NSE
+result = calibrate(
+    forcing=forcing,
+    observed=observed,
+    objectives={"nse": "maximize"},
+    bounds={"x1": (1, 2500), "x2": (-5, 5), "x3": (1, 1000),
+            "x4": (0.5, 10), "x5": (-4, 4), "x6": (0.01, 20)},
+    warmup=365,
+)
+
+print(f"Best NSE: {result.score['nse']:.3f}")
+print(f"Optimized X1: {result.parameters.x1:.1f}")
+```
+
 ## Model Parameters
 
 | Parameter | Description | Unit | Typical Range |
@@ -197,6 +232,7 @@ For detailed CemaNeige equations and algorithm, see [`docs/CEMANEIGE.md`](docs/C
 - Snow module: [`docs/CEMANEIGE.md`](docs/CEMANEIGE.md)
 - User guide: [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md)
 - Input validation: [`docs/FORCING_DATA_CONTRACT.md`](docs/FORCING_DATA_CONTRACT.md)
+- Calibration guide: [`docs/USER_GUIDE.md#calibration`](docs/USER_GUIDE.md#calibration)
 
 ## References
 

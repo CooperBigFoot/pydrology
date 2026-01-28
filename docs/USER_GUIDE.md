@@ -11,7 +11,8 @@ A complete guide to using the GR6J hydrological model Python implementation.
 5. [Model Outputs](#model-outputs)
 6. [Snow Module](#snow-module)
 7. [Advanced Usage](#advanced-usage)
-8. [Common Errors](#common-errors)
+8. [Calibration](#calibration)
+9. [Common Errors](#common-errors)
 
 ---
 
@@ -799,6 +800,180 @@ full_forcing = ForcingData(
     pet=np.concatenate([forcing1.pet, forcing2.pet]),
 )
 output = run(params, full_forcing)
+```
+
+---
+
+## Calibration
+
+The GR6J package includes automatic parameter calibration using evolutionary algorithms via the [ctrl-freak](https://github.com/hydrosolutions/ctrl-freak) library.
+
+### Single-Objective Calibration
+
+Optimize parameters to maximize a single metric (e.g., Nash-Sutcliffe Efficiency):
+
+```python
+import numpy as np
+from gr6j import ForcingData, calibrate, ObservedData, Parameters
+
+# Prepare forcing data (including warmup period)
+n_days = 365 + 365  # 1 year warmup + 1 year calibration
+forcing = ForcingData(
+    time=np.datetime64("2019-01-01") + np.arange(n_days),
+    precip=precip_data,
+    pet=pet_data,
+)
+
+# Observed streamflow (post-warmup only)
+observed = ObservedData(
+    time=forcing.time[365:],
+    streamflow=observed_streamflow,
+)
+
+# Define parameter bounds
+bounds = {
+    "x1": (1, 2500),    # Production store capacity [mm]
+    "x2": (-5, 5),      # Intercatchment exchange [mm/day]
+    "x3": (1, 1000),    # Routing store capacity [mm]
+    "x4": (0.5, 10),    # UH time constant [days]
+    "x5": (-4, 4),      # Exchange threshold [-]
+    "x6": (0.01, 20),   # Exponential store parameter [mm]
+}
+
+# Run calibration
+result = calibrate(
+    forcing=forcing,
+    observed=observed,
+    objectives={"nse": "maximize"},
+    bounds=bounds,
+    warmup=365,
+    population_size=50,
+    generations=100,
+    seed=42,
+)
+
+print(f"Best NSE: {result.score['nse']:.3f}")
+print(f"X1: {result.parameters.x1:.1f}")
+```
+
+### Multi-Objective Calibration
+
+Optimize for multiple metrics simultaneously to obtain a Pareto front:
+
+```python
+from gr6j import Catchment, ForcingData, ObservedData, calibrate
+
+# With snow module enabled
+forcing = ForcingData(
+    time=np.datetime64("2019-01-01") + np.arange(n_days),
+    precip=precip_data,
+    pet=pet_data,
+    temp=temp_data,
+)
+
+catchment = Catchment(mean_annual_solid_precip=150.0)
+
+# Bounds including snow parameters
+bounds = {
+    "x1": (1, 2500), "x2": (-5, 5), "x3": (1, 1000),
+    "x4": (0.5, 10), "x5": (-4, 4), "x6": (0.01, 20),
+    "ctg": (0, 1),      # Thermal state coefficient [-]
+    "kf": (1, 10),      # Degree-day melt factor [mm/°C/day]
+}
+
+# Multi-objective returns list of Pareto-optimal solutions
+solutions = calibrate(
+    forcing=forcing,
+    observed=observed,
+    objectives={"nse": "maximize", "log_nse": "maximize"},
+    bounds=bounds,
+    catchment=catchment,
+    snow=True,
+    warmup=365,
+    population_size=50,
+    generations=100,
+)
+
+print(f"Found {len(solutions)} Pareto-optimal solutions")
+for i, sol in enumerate(solutions[:3]):
+    print(f"  {i+1}: NSE={sol.score['nse']:.3f}, log-NSE={sol.score['log_nse']:.3f}")
+```
+
+### ObservedData
+
+Container for observed streamflow matching the post-warmup period of forcing data.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `time` | `np.ndarray` (datetime64) | Timestamp for each observation |
+| `streamflow` | `np.ndarray` (float64) | Observed streamflow [mm/day] |
+
+**Validation:** Same rules as `ForcingData` - 1D arrays, no NaN, matching lengths.
+
+### Available Metrics
+
+| Metric | Direction | Description |
+|--------|-----------|-------------|
+| `nse` | maximize | Nash-Sutcliffe Efficiency |
+| `log_nse` | maximize | NSE on log-transformed flows (emphasizes low flows) |
+| `kge` | maximize | Kling-Gupta Efficiency |
+| `pbias` | minimize | Percent Bias |
+| `rmse` | minimize | Root Mean Square Error |
+| `mae` | minimize | Mean Absolute Error |
+
+List available metrics programmatically:
+
+```python
+from gr6j import list_metrics
+print(list_metrics())  # ['kge', 'log_nse', 'mae', 'nse', 'pbias', 'rmse']
+```
+
+### Custom Metrics
+
+Register custom metrics using the `@register` decorator:
+
+```python
+from gr6j.calibration.metrics import register
+import numpy as np
+
+@register("minimize")
+def custom_rmse(observed, simulated):
+    """Custom RMSE focusing on high flows."""
+    obs = np.asarray(observed)
+    sim = np.asarray(simulated)
+    # Weight high flows more heavily
+    weights = obs / obs.max()
+    return float(np.sqrt(np.mean(weights * (obs - sim) ** 2)))
+```
+
+### Warmup Period
+
+The warmup period allows model stores to reach dynamic equilibrium before evaluation:
+
+| Climate | Recommended Warmup |
+|---------|-------------------|
+| Temperate | 365 days (1 year) |
+| Cold/snow-dominated | 730 days (2 years) |
+| Highly seasonal | 730+ days |
+
+**Important:** `len(observed) == len(forcing) - warmup` must hold.
+
+### Early Stopping via Callback
+
+Monitor optimization progress and stop early if needed:
+
+```python
+def my_callback(result, generation):
+    # For GA: result.best returns (params, fitness)
+    _, fitness = result.best
+    print(f"Gen {generation}: best fitness = {-fitness:.4f}")
+    # Return True to stop early
+    return fitness < -0.95  # Stop if NSE > 0.95
+
+result = calibrate(
+    ...,
+    callback=my_callback,
+)
 ```
 
 ---
