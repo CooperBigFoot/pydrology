@@ -132,6 +132,24 @@ def _warn_if_outside_bounds(catchment: Catchment) -> None:
             )
 
 
+def _validate_multi_layer_config(catchment: Catchment) -> None:
+    """Validate that multi-layer configuration is complete.
+
+    When n_layers > 1, hypsometric_curve and input_elevation are required.
+    Raises ValueError if the configuration is incomplete.
+    """
+    if catchment.n_layers > 1:
+        if catchment.hypsometric_curve is None:
+            msg = "hypsometric_curve is required when n_layers > 1"
+            raise ValueError(msg)
+        if catchment.input_elevation is None:
+            msg = "input_elevation is required when n_layers > 1"
+            raise ValueError(msg)
+        if len(catchment.hypsometric_curve) != 101:
+            msg = f"hypsometric_curve must have 101 points (percentiles 0-100), got {len(catchment.hypsometric_curve)}"
+            raise ValueError(msg)
+
+
 @dataclass(frozen=True)
 class Catchment:
     """Static catchment properties for the GR6J model.
@@ -142,6 +160,8 @@ class Catchment:
         hypsometric_curve: Optional elevation distribution for multi-layer snow.
         input_elevation: Optional elevation of forcing data [m].
         n_layers: Number of elevation bands for snow (default 1).
+        temp_gradient: Temperature lapse rate [°C/100m]. If None, uses default 0.6.
+        precip_gradient: Precipitation gradient [m⁻¹]. If None, uses default 0.00041.
     """
 
     mean_annual_solid_precip: float  # [mm/year]
@@ -150,6 +170,8 @@ class Catchment:
     hypsometric_curve: np.ndarray | None = None
     input_elevation: float | None = None
     n_layers: int = 1
+    temp_gradient: float | None = None  # Temperature lapse rate [°C/100m]
+    precip_gradient: float | None = None  # Precipitation gradient [m⁻¹]
 
     # Class-level reference to bounds for external access
     BOUNDS: ClassVar[dict[str, tuple[float, float]]] = _CATCHMENT_BOUNDS
@@ -157,3 +179,4 @@ class Catchment:
     def __post_init__(self) -> None:
         """Validate catchment properties and warn if outside typical ranges."""
         _warn_if_outside_bounds(self)
+        _validate_multi_layer_config(self)

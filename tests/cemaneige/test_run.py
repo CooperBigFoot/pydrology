@@ -7,8 +7,8 @@ CEMANEIGE.md algorithm.
 import numpy as np
 import pytest
 
-from gr6j.cemaneige.run import cemaneige_step
-from gr6j.cemaneige.types import CemaNeige, CemaNeigeSingleLayerState
+from gr6j.cemaneige.run import cemaneige_multi_layer_step, cemaneige_step
+from gr6j.cemaneige.types import CemaNeige, CemaNeigeMultiLayerState, CemaNeigeSingleLayerState
 
 EXPECTED_FLUX_KEYS = {
     "snow_pliq",
@@ -283,3 +283,188 @@ class TestCemaNeigeStepe:
         )
 
         assert fluxes["snow_temp"] == -7.5
+
+
+class TestCemaNeigeMultiLayerStep:
+    """Tests for cemaneige_multi_layer_step function."""
+
+    @pytest.fixture
+    def multi_layer_state(self) -> CemaNeigeMultiLayerState:
+        """5-layer initial state."""
+        return CemaNeigeMultiLayerState.initialize(n_layers=5, mean_annual_solid_precip=150.0)
+
+    @pytest.fixture
+    def layer_elevations(self) -> np.ndarray:
+        """Layer elevations for 5 bands."""
+        return np.array([300.0, 700.0, 1100.0, 1500.0, 1900.0])
+
+    @pytest.fixture
+    def layer_fractions(self) -> np.ndarray:
+        """Uniform fractions for 5 bands."""
+        return np.full(5, 0.2)
+
+    def test_returns_three_tuple(
+        self,
+        multi_layer_state: CemaNeigeMultiLayerState,
+        typical_params: CemaNeige,
+        layer_elevations: np.ndarray,
+        layer_fractions: np.ndarray,
+    ) -> None:
+        """Returns (state, aggregated_fluxes, per_layer_fluxes)."""
+        result = cemaneige_multi_layer_step(
+            state=multi_layer_state,
+            params=typical_params,
+            precip=10.0,
+            temp=-5.0,
+            layer_elevations=layer_elevations,
+            layer_fractions=layer_fractions,
+            input_elevation=500.0,
+        )
+
+        assert isinstance(result, tuple)
+        assert len(result) == 3
+        new_state, agg_fluxes, per_layer = result
+        assert isinstance(new_state, CemaNeigeMultiLayerState)
+        assert isinstance(agg_fluxes, dict)
+        assert isinstance(per_layer, list)
+        assert len(per_layer) == 5
+
+    def test_aggregated_fluxes_have_all_keys(
+        self,
+        multi_layer_state: CemaNeigeMultiLayerState,
+        typical_params: CemaNeige,
+        layer_elevations: np.ndarray,
+        layer_fractions: np.ndarray,
+    ) -> None:
+        """Aggregated fluxes have same keys as single-layer step."""
+        _, agg_fluxes, _ = cemaneige_multi_layer_step(
+            state=multi_layer_state,
+            params=typical_params,
+            precip=10.0,
+            temp=-5.0,
+            layer_elevations=layer_elevations,
+            layer_fractions=layer_fractions,
+            input_elevation=500.0,
+        )
+
+        assert set(agg_fluxes.keys()) == EXPECTED_FLUX_KEYS
+
+    def test_per_layer_fluxes_have_all_keys(
+        self,
+        multi_layer_state: CemaNeigeMultiLayerState,
+        typical_params: CemaNeige,
+        layer_elevations: np.ndarray,
+        layer_fractions: np.ndarray,
+    ) -> None:
+        """Each layer's fluxes have all expected keys."""
+        _, _, per_layer = cemaneige_multi_layer_step(
+            state=multi_layer_state,
+            params=typical_params,
+            precip=10.0,
+            temp=-5.0,
+            layer_elevations=layer_elevations,
+            layer_fractions=layer_fractions,
+            input_elevation=500.0,
+        )
+
+        for layer_fluxes in per_layer:
+            assert set(layer_fluxes.keys()) == EXPECTED_FLUX_KEYS
+
+    def test_higher_layers_are_colder(
+        self,
+        multi_layer_state: CemaNeigeMultiLayerState,
+        typical_params: CemaNeige,
+        layer_elevations: np.ndarray,
+        layer_fractions: np.ndarray,
+    ) -> None:
+        """Higher elevation layers receive colder temperatures."""
+        _, _, per_layer = cemaneige_multi_layer_step(
+            state=multi_layer_state,
+            params=typical_params,
+            precip=10.0,
+            temp=5.0,  # Warm at input elevation
+            layer_elevations=layer_elevations,
+            layer_fractions=layer_fractions,
+            input_elevation=500.0,
+        )
+
+        temps = [lf["snow_temp"] for lf in per_layer]
+        # Higher layers should be colder
+        for i in range(len(temps) - 1):
+            assert temps[i] > temps[i + 1]
+
+    def test_aggregated_is_weighted_average(
+        self,
+        multi_layer_state: CemaNeigeMultiLayerState,
+        typical_params: CemaNeige,
+        layer_elevations: np.ndarray,
+        layer_fractions: np.ndarray,
+    ) -> None:
+        """Aggregated pliq_and_melt is the weighted average of per-layer values."""
+        _, agg_fluxes, per_layer = cemaneige_multi_layer_step(
+            state=multi_layer_state,
+            params=typical_params,
+            precip=10.0,
+            temp=0.0,
+            layer_elevations=layer_elevations,
+            layer_fractions=layer_fractions,
+            input_elevation=500.0,
+        )
+
+        expected = sum(lf["snow_pliq_and_melt"] * float(f) for lf, f in zip(per_layer, layer_fractions, strict=True))
+        assert agg_fluxes["snow_pliq_and_melt"] == pytest.approx(expected)
+
+    def test_state_preserved_across_layers(
+        self,
+        multi_layer_state: CemaNeigeMultiLayerState,
+        typical_params: CemaNeige,
+        layer_elevations: np.ndarray,
+        layer_fractions: np.ndarray,
+    ) -> None:
+        """New state has correct number of layers."""
+        new_state, _, _ = cemaneige_multi_layer_step(
+            state=multi_layer_state,
+            params=typical_params,
+            precip=10.0,
+            temp=-5.0,
+            layer_elevations=layer_elevations,
+            layer_fractions=layer_fractions,
+            input_elevation=500.0,
+        )
+
+        assert len(new_state) == 5
+
+    def test_custom_gradients(
+        self,
+        multi_layer_state: CemaNeigeMultiLayerState,
+        typical_params: CemaNeige,
+        layer_elevations: np.ndarray,
+        layer_fractions: np.ndarray,
+    ) -> None:
+        """Custom gradients produce different results from defaults."""
+        _, fluxes_default, _ = cemaneige_multi_layer_step(
+            state=multi_layer_state,
+            params=typical_params,
+            precip=10.0,
+            temp=0.0,
+            layer_elevations=layer_elevations,
+            layer_fractions=layer_fractions,
+            input_elevation=500.0,
+        )
+
+        # Reset state for fair comparison
+        state2 = CemaNeigeMultiLayerState.initialize(n_layers=5, mean_annual_solid_precip=150.0)
+        _, fluxes_custom, _ = cemaneige_multi_layer_step(
+            state=state2,
+            params=typical_params,
+            precip=10.0,
+            temp=0.0,
+            layer_elevations=layer_elevations,
+            layer_fractions=layer_fractions,
+            input_elevation=500.0,
+            temp_gradient=1.0,
+            precip_gradient=0.001,
+        )
+
+        # Different gradients should produce different results
+        assert fluxes_default["snow_pliq_and_melt"] != pytest.approx(fluxes_custom["snow_pliq_and_melt"])

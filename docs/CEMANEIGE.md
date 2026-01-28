@@ -134,7 +134,7 @@ output = run(params, forcing, catchment=catchment)
 
 ## 3. State Variables
 
-The model maintains **4 state variables**:
+The model maintains **4 state variables per elevation layer**:
 
 | State | Symbol | Description | Unit | Initialization |
 |-------|--------|-------------|------|----------------|
@@ -142,6 +142,8 @@ The model maintains **4 state variables**:
 | Thermal state | eTG | Weighted snow temperature | °C | 0°C |
 | Melt threshold | Gthreshold | Snow pack threshold for melt | mm | 0.9 × MeanAnSolidPrecip |
 | Local maximum | Glocalmax | Hysteresis memory variable | mm | Gthreshold |
+
+For multi-layer simulations with N elevation bands, the total CemaNeige state count is **4 × N** (4 state variables per layer).
 
 **Key constraints:**
 
@@ -478,6 +480,14 @@ OUTPUT: PliqAndMelt (to GR model as precipitation)
 | T_snow | -1°C | Below this, all precipitation is snow |
 | T_rain | 3°C | Above this, all precipitation is rain |
 
+### Elevation Band Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| GRAD_T_DEFAULT | 0.6 | Default temperature lapse rate [°C/100m] |
+| GRAD_P_DEFAULT | 0.00041 | Default precipitation gradient [m⁻¹] |
+| ELEV_CAP_PRECIP | 4000.0 | Maximum elevation for precip extrapolation [m] |
+
 ---
 
 ## 9. Coupling with GR6J
@@ -570,39 +580,110 @@ print(output.snow.snow_melt)     # Daily melt
 
 ## 10. Elevation Bands
 
-CemaNeige is typically run on **multiple elevation bands** to account for temperature and precipitation gradients with altitude.
+CemaNeige supports **multi-layer elevation bands** to account for temperature and precipitation gradients with altitude. Each layer runs an independent CemaNeige instance, and outputs are aggregated by area-weighted averaging.
 
-### Recommended Configuration
+### 10.1 Recommended Configuration
 
 | Setting | Value |
 |---------|-------|
-| Number of layers | 5 (optimal) |
-| Hypsometric curve | 101-point elevation distribution |
+| Number of layers | 5 (optimal, based on Valéry et al. 2014) |
+| Hypsometric curve | 101-point elevation distribution (percentiles 0-100%) |
+| Equal area bands | Each layer represents 1/N of the catchment area |
 
-### Temperature Lapse Rate
+### 10.2 Layer Derivation
 
-Temperature is extrapolated to each elevation band using daily gradients:
+Layers are derived from the hypsometric curve (cumulative elevation distribution):
 
-$$T_{layer} = T_{input} + (Z_{input} - Z_{layer}) \times \frac{GradT}{100}$$
+1. The catchment area is divided into N equal bands
+2. For layer i (0-indexed), the percentile bounds are:
+   - Lower: `i × 100 / N`
+   - Upper: `(i+1) × 100 / N`
+3. The representative elevation is the midpoint of the bounds interpolated from the hypsometric curve
+
+### 10.3 Temperature Lapse Rate
+
+Temperature is extrapolated to each elevation band using a linear lapse rate:
+
+$$T_{layer} = T_{input} - \frac{GradT}{100} \times (Z_{layer} - Z_{input})$$
 
 Where:
-- $Z_{input}$ = elevation of input data [m]
-- $Z_{layer}$ = representative elevation of layer [m]
-- $GradT$ = temperature gradient [°C/100m] (varies by day of year)
+- $T_{input}$ = temperature at the forcing station [°C]
+- $Z_{input}$ = elevation of the forcing station [m]
+- $Z_{layer}$ = representative elevation of the layer [m]
+- $GradT$ = temperature lapse rate [°C/100m] (default: 0.6)
 
-### Precipitation Gradient
+Note: Positive $GradT$ means temperature **decreases** with elevation (standard atmospheric lapse rate).
+
+### 10.4 Precipitation Gradient
 
 Precipitation is extrapolated using an exponential gradient (Valéry, 2010):
 
-$$P_{layer} = P_{input} \times \exp(GradP \times (Z_{layer} - Z_{input}))$$
+$$P_{layer} = P_{input} \times \exp\left(GradP \times (Z_{layer,eff} - Z_{input,eff})\right)$$
 
-Where $GradP = 0.00041$ m⁻¹ (capped at 4000m elevation).
+Where:
+- $GradP$ = precipitation gradient [m⁻¹] (default: 0.00041)
+- $Z_{layer,eff} = \min(Z_{layer}, 4000)$ — elevation capped at 4000m
+- $Z_{input,eff} = \min(Z_{input}, 4000)$ — elevation capped at 4000m
 
-### Layer Aggregation
+The cap prevents unrealistic precipitation extrapolation at very high elevations.
 
-The final output is the area-weighted average across all layers:
+### 10.5 Layer Aggregation
 
-$$PliqAndMelt_{catchment} = \frac{1}{N_{layers}} \sum_{i=1}^{N_{layers}} PliqAndMelt_i$$
+Each layer runs an independent CemaNeige timestep. The catchment-scale output is the area-weighted average across all layers:
+
+$$PliqAndMelt_{catchment} = \sum_{i=1}^{N} w_i \times PliqAndMelt_i$$
+
+Where $w_i = 1/N$ for equal-area bands.
+
+All flux variables are aggregated the same way (snow_pack, snow_melt, etc.).
+
+### 10.6 Python API Example
+
+```python
+import numpy as np
+from gr6j import Catchment, CemaNeige, ForcingData, Parameters, run
+
+# Define 5-layer catchment with hypsometric curve
+catchment = Catchment(
+    mean_annual_solid_precip=150.0,
+    n_layers=5,
+    hypsometric_curve=np.linspace(200.0, 2000.0, 101),  # 101 points
+    input_elevation=500.0,  # Elevation of forcing station [m]
+)
+
+# Optional: custom gradients (defaults used if None)
+catchment_custom = Catchment(
+    mean_annual_solid_precip=150.0,
+    n_layers=5,
+    hypsometric_curve=np.linspace(200.0, 2000.0, 101),
+    input_elevation=500.0,
+    temp_gradient=0.8,       # Custom lapse rate [°C/100m]
+    precip_gradient=0.0005,  # Custom precip gradient [m⁻¹]
+)
+
+params = Parameters(
+    x1=350.0, x2=0.0, x3=90.0, x4=1.7, x5=0.0, x6=5.0,
+    snow=CemaNeige(ctg=0.97, kf=2.5),
+)
+
+forcing = ForcingData(
+    time=np.arange(365, dtype='datetime64[D]') + np.datetime64('2020-01-01'),
+    precip=precip_array,
+    pet=pet_array,
+    temp=temp_array,
+)
+
+output = run(params, forcing, catchment=catchment)
+
+# Aggregated outputs (area-weighted average)
+print(output.snow.snow_pack)         # Shape: (365,)
+print(output.snow.snow_melt)         # Shape: (365,)
+
+# Per-layer outputs
+print(output.snow_layers.snow_pack)  # Shape: (365, 5)
+print(output.snow_layers.layer_temp) # Shape: (365, 5)
+print(output.snow_layers.layer_elevations)  # Shape: (5,)
+```
 
 ---
 

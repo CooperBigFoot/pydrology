@@ -1,9 +1,15 @@
 """CemaNeige snow model orchestration functions.
 
-This module provides the main entry point for running the CemaNeige snow model:
-- cemaneige_step(): Execute a single timestep
+This module provides the main entry points for running the CemaNeige snow model:
+- cemaneige_step(): Execute a single timestep for single-layer mode
+- cemaneige_multi_layer_step(): Execute a single timestep for multi-layer mode
 """
 
+from __future__ import annotations
+
+import numpy as np
+
+from .layers import extrapolate_precipitation, extrapolate_temperature
 from .processes import (
     compute_actual_melt,
     compute_gratio,
@@ -12,7 +18,7 @@ from .processes import (
     partition_precipitation,
     update_thermal_state,
 )
-from .types import CemaNeige, CemaNeigeSingleLayerState
+from .types import CemaNeige, CemaNeigeMultiLayerState, CemaNeigeSingleLayerState
 
 
 def cemaneige_step(
@@ -114,3 +120,98 @@ def cemaneige_step(
     }
 
     return new_state, fluxes
+
+
+def _aggregate_layer_fluxes(
+    all_layer_fluxes: list[dict[str, float]],
+    layer_fractions: list[float],
+) -> dict[str, float]:
+    """Compute area-weighted average of per-layer fluxes.
+
+    Args:
+        all_layer_fluxes: List of flux dictionaries, one per layer.
+        layer_fractions: Area fraction of each layer [-].
+
+    Returns:
+        Single dictionary with area-weighted average fluxes.
+    """
+    keys = all_layer_fluxes[0].keys()
+    aggregated: dict[str, float] = {}
+    for key in keys:
+        aggregated[key] = sum(
+            fluxes[key] * fraction for fluxes, fraction in zip(all_layer_fluxes, layer_fractions, strict=True)
+        )
+    return aggregated
+
+
+def cemaneige_multi_layer_step(
+    state: CemaNeigeMultiLayerState,
+    params: CemaNeige,
+    precip: float,
+    temp: float,
+    layer_elevations: list[float] | np.ndarray,
+    layer_fractions: list[float] | np.ndarray,
+    input_elevation: float,
+    temp_gradient: float | None = None,
+    precip_gradient: float | None = None,
+) -> tuple[CemaNeigeMultiLayerState, dict[str, float], list[dict[str, float]]]:
+    """Execute one timestep of multi-layer CemaNeige.
+
+    Runs the CemaNeige snow model independently on each elevation band,
+    extrapolating temperature and precipitation to each layer's elevation,
+    then aggregates the results using area-weighted averaging.
+
+    Args:
+        state: Current multi-layer state.
+        params: CemaNeige parameters (ctg, kf).
+        precip: Total precipitation at input elevation [mm/day].
+        temp: Air temperature at input elevation [°C].
+        layer_elevations: Representative elevation of each layer [m].
+        layer_fractions: Area fraction of each layer [-].
+        input_elevation: Elevation of the input forcing data [m].
+        temp_gradient: Temperature lapse rate [°C/100m]. If None, uses default.
+        precip_gradient: Precipitation gradient [m⁻¹]. If None, uses default.
+
+    Returns:
+        Tuple of (new_state, aggregated_fluxes, per_layer_fluxes):
+        - new_state: Updated CemaNeigeMultiLayerState
+        - aggregated_fluxes: Area-weighted average fluxes (same keys as cemaneige_step)
+        - per_layer_fluxes: List of flux dicts, one per layer
+    """
+    n_layers = len(state)
+    new_layer_states: list[CemaNeigeSingleLayerState] = []
+    per_layer_fluxes: list[dict[str, float]] = []
+
+    for i in range(n_layers):
+        # Extrapolate temperature to this layer's elevation
+        layer_temp_kwargs: dict[str, float] = {}
+        if temp_gradient is not None:
+            layer_temp_kwargs["gradient"] = temp_gradient
+        layer_temp = extrapolate_temperature(temp, input_elevation, float(layer_elevations[i]), **layer_temp_kwargs)
+
+        # Extrapolate precipitation to this layer's elevation
+        layer_precip_kwargs: dict[str, float] = {}
+        if precip_gradient is not None:
+            layer_precip_kwargs["gradient"] = precip_gradient
+        layer_precip = extrapolate_precipitation(
+            precip, input_elevation, float(layer_elevations[i]), **layer_precip_kwargs
+        )
+
+        # Run single-layer step for this band
+        new_layer_state, layer_fluxes = cemaneige_step(
+            state=state[i],
+            params=params,
+            precip=layer_precip,
+            temp=layer_temp,
+        )
+
+        new_layer_states.append(new_layer_state)
+        per_layer_fluxes.append(layer_fluxes)
+
+    # Aggregate fluxes across layers
+    fractions = [float(f) for f in layer_fractions]
+    aggregated_fluxes = _aggregate_layer_fluxes(per_layer_fluxes, fractions)
+
+    new_state = CemaNeigeMultiLayerState(layer_states=new_layer_states)
+
+    return new_state, aggregated_fluxes, per_layer_fluxes

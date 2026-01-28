@@ -7,9 +7,10 @@ This module provides the main entry points for running the GR6J model:
 
 import numpy as np
 
-from ..cemaneige import CemaNeigeSingleLayerState, cemaneige_step
+from ..cemaneige import CemaNeigeMultiLayerState, CemaNeigeSingleLayerState, cemaneige_multi_layer_step, cemaneige_step
+from ..cemaneige.layers import derive_layers
 from ..inputs import Catchment, ForcingData
-from ..outputs import GR6JOutput, ModelOutput, SnowOutput
+from ..outputs import GR6JOutput, ModelOutput, SnowLayerOutputs, SnowOutput
 from .constants import B, C
 from .processes import (
     direct_branch,
@@ -151,7 +152,7 @@ def run(
     forcing: ForcingData,
     catchment: Catchment | None = None,
     initial_state: State | None = None,
-    initial_snow_state: CemaNeigeSingleLayerState | None = None,
+    initial_snow_state: CemaNeigeSingleLayerState | CemaNeigeMultiLayerState | None = None,
 ) -> ModelOutput:
     """Run the GR6J model over a timeseries.
 
@@ -165,12 +166,16 @@ def run(
         catchment: Catchment properties. Required when snow module is enabled
             for mean_annual_solid_precip initialization.
         initial_state: Initial model state. If None, uses State.initialize(params).
-        initial_snow_state: Optional initial CemaNeige state. If None and
-            snow module is enabled, uses CemaNeigeSingleLayerState.initialize().
+        initial_snow_state: Optional initial CemaNeige state. Accepts both
+            CemaNeigeSingleLayerState (single-layer) and CemaNeigeMultiLayerState
+            (multi-layer). If None and snow module is enabled, initializes
+            automatically based on catchment.n_layers.
 
     Returns:
         ModelOutput containing GR6J outputs and optionally snow outputs.
         Access streamflow via result.gr6j.streamflow (numpy array).
+        When multi-layer snow mode is used, per-layer outputs are available
+        via result.snow_layers (SnowLayerOutputs).
         Convert to DataFrame via result.to_dataframe().
 
     Raises:
@@ -199,13 +204,34 @@ def run(
     state = State.initialize(params) if initial_state is None else initial_state
 
     # Initialize snow state if snow module enabled
-    snow_state: CemaNeigeSingleLayerState | None = None
+    snow_state: CemaNeigeSingleLayerState | CemaNeigeMultiLayerState | None = None
+    is_multi_layer = False
+    layer_elevations: np.ndarray | None = None
+    layer_fractions: np.ndarray | None = None
+
     if params.has_snow:
-        snow_state = (
-            CemaNeigeSingleLayerState.initialize(catchment.mean_annual_solid_precip)  # type: ignore  # validated above
-            if initial_snow_state is None
-            else initial_snow_state
-        )
+        assert catchment is not None  # validated above
+
+        if catchment.n_layers > 1:
+            is_multi_layer = True
+            # Derive layer properties from hypsometric curve
+            layer_elevations, layer_fractions = derive_layers(
+                catchment.hypsometric_curve,
+                catchment.n_layers,  # type: ignore[arg-type]
+            )
+
+            if initial_snow_state is None:
+                snow_state = CemaNeigeMultiLayerState.initialize(
+                    n_layers=catchment.n_layers,
+                    mean_annual_solid_precip=catchment.mean_annual_solid_precip,
+                )
+            else:
+                snow_state = initial_snow_state
+        else:
+            if initial_snow_state is None:
+                snow_state = CemaNeigeSingleLayerState.initialize(catchment.mean_annual_solid_precip)
+            else:
+                snow_state = initial_snow_state
 
     # Compute unit hydrograph ordinates once
     uh1_ordinates, uh2_ordinates = compute_uh_ordinates(params.x4)
@@ -255,6 +281,20 @@ def run(
             "snow_glocalmax": [],
         }
 
+    # Per-layer outputs for multi-layer mode
+    layer_output_data: dict[str, list[list[float]]] | None = None
+    if params.has_snow and is_multi_layer:
+        assert layer_elevations is not None
+        layer_output_data = {
+            "snow_pack": [],
+            "snow_thermal_state": [],
+            "snow_gratio": [],
+            "snow_melt": [],
+            "snow_pliq_and_melt": [],
+            "layer_temp": [],
+            "layer_precip": [],
+        }
+
     # Run model for each timestep
     for idx in range(n_timesteps):
         precip = float(forcing.precip[idx])
@@ -266,13 +306,42 @@ def run(
         # Run snow module if enabled
         snow_fluxes: dict[str, float] = {}
         if params.has_snow and snow_state is not None:
-            temp = float(forcing.temp[idx])  # type: ignore  # validated above
-            snow_state, snow_fluxes = cemaneige_step(
-                state=snow_state,
-                params=params.snow,  # type: ignore  # validated via has_snow
-                precip=precip,
-                temp=temp,
-            )
+            temp = float(forcing.temp[idx])  # type: ignore[index]
+            assert catchment is not None
+
+            if is_multi_layer and isinstance(snow_state, CemaNeigeMultiLayerState):
+                assert layer_elevations is not None
+                assert layer_fractions is not None
+
+                snow_state, snow_fluxes, per_layer_fluxes = cemaneige_multi_layer_step(
+                    state=snow_state,
+                    params=params.snow,  # type: ignore[arg-type]
+                    precip=precip,
+                    temp=temp,
+                    layer_elevations=layer_elevations,
+                    layer_fractions=layer_fractions,
+                    input_elevation=catchment.input_elevation,  # type: ignore[arg-type]
+                    temp_gradient=catchment.temp_gradient,
+                    precip_gradient=catchment.precip_gradient,
+                )
+
+                # Store per-layer data
+                if layer_output_data is not None:
+                    for key in ["snow_pack", "snow_thermal_state", "snow_gratio", "snow_melt", "snow_pliq_and_melt"]:
+                        layer_output_data[key].append([lf[key] for lf in per_layer_fluxes])
+                    layer_output_data["layer_temp"].append([lf["snow_temp"] for lf in per_layer_fluxes])
+                    layer_output_data["layer_precip"].append(
+                        [lf["snow_pliq"] + lf["snow_psol"] for lf in per_layer_fluxes]
+                    )
+            else:
+                assert isinstance(snow_state, CemaNeigeSingleLayerState)
+                snow_state, snow_fluxes = cemaneige_step(
+                    state=snow_state,
+                    params=params.snow,  # type: ignore[arg-type]
+                    precip=precip,
+                    temp=temp,
+                )
+
             # Use snow output as GR6J precipitation input
             precip = snow_fluxes["snow_pliq_and_melt"]
 
@@ -304,8 +373,23 @@ def run(
         snow_arrays = {k: np.array(v) for k, v in snow_outputs.items()}
         snow_output = SnowOutput(**snow_arrays)
 
+    snow_layer_output: SnowLayerOutputs | None = None
+    if layer_output_data is not None and layer_elevations is not None and layer_fractions is not None:
+        snow_layer_output = SnowLayerOutputs(
+            layer_elevations=layer_elevations,
+            layer_fractions=layer_fractions,
+            snow_pack=np.array(layer_output_data["snow_pack"]),
+            snow_thermal_state=np.array(layer_output_data["snow_thermal_state"]),
+            snow_gratio=np.array(layer_output_data["snow_gratio"]),
+            snow_melt=np.array(layer_output_data["snow_melt"]),
+            snow_pliq_and_melt=np.array(layer_output_data["snow_pliq_and_melt"]),
+            layer_temp=np.array(layer_output_data["layer_temp"]),
+            layer_precip=np.array(layer_output_data["layer_precip"]),
+        )
+
     return ModelOutput(
         time=forcing.time,
         gr6j=gr6j_output,
         snow=snow_output,
+        snow_layers=snow_layer_output,
     )

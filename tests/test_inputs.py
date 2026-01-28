@@ -210,7 +210,7 @@ class TestCatchment:
 
     def test_creates_with_optional_fields(self) -> None:
         """Catchment instantiates correctly with optional fields."""
-        hypsometric = np.array([0.1, 0.2, 0.3, 0.2, 0.2])
+        hypsometric = np.linspace(200.0, 2000.0, 101)
         catchment = Catchment(
             mean_annual_solid_precip=150.0,
             hypsometric_curve=hypsometric,
@@ -264,3 +264,72 @@ class TestCatchment:
 
         with pytest.raises(AttributeError):
             catchment.mean_annual_solid_precip = 200.0  # type: ignore[misc]
+
+
+class TestCatchmentMultiLayerValidation:
+    """Tests for Catchment multi-layer validation."""
+
+    def test_rejects_multi_layer_without_hypsometric_curve(self) -> None:
+        """ValueError when n_layers > 1 but hypsometric_curve is None."""
+        with pytest.raises(ValueError, match="hypsometric_curve is required"):
+            Catchment(
+                mean_annual_solid_precip=150.0,
+                n_layers=5,
+                input_elevation=500.0,
+            )
+
+    def test_rejects_multi_layer_without_input_elevation(self) -> None:
+        """ValueError when n_layers > 1 but input_elevation is None."""
+        with pytest.raises(ValueError, match="input_elevation is required"):
+            Catchment(
+                mean_annual_solid_precip=150.0,
+                n_layers=5,
+                hypsometric_curve=np.linspace(200.0, 2000.0, 101),
+            )
+
+    def test_rejects_wrong_hypsometric_curve_length(self) -> None:
+        """ValueError when hypsometric_curve doesn't have 101 points."""
+        with pytest.raises(ValueError, match="101 points"):
+            Catchment(
+                mean_annual_solid_precip=150.0,
+                n_layers=5,
+                hypsometric_curve=np.linspace(200.0, 2000.0, 50),
+                input_elevation=500.0,
+            )
+
+    def test_accepts_valid_multi_layer_config(self) -> None:
+        """Valid multi-layer configuration creates Catchment successfully."""
+        catchment = Catchment(
+            mean_annual_solid_precip=150.0,
+            n_layers=5,
+            hypsometric_curve=np.linspace(200.0, 2000.0, 101),
+            input_elevation=500.0,
+        )
+
+        assert catchment.n_layers == 5
+
+    def test_single_layer_needs_no_extra_fields(self) -> None:
+        """n_layers=1 doesn't require hypsometric_curve or input_elevation."""
+        catchment = Catchment(mean_annual_solid_precip=150.0)
+
+        assert catchment.n_layers == 1
+        assert catchment.hypsometric_curve is None
+        assert catchment.input_elevation is None
+
+    def test_gradient_fields_are_optional(self) -> None:
+        """temp_gradient and precip_gradient default to None."""
+        catchment = Catchment(mean_annual_solid_precip=150.0)
+
+        assert catchment.temp_gradient is None
+        assert catchment.precip_gradient is None
+
+    def test_custom_gradients_are_stored(self) -> None:
+        """Custom gradient values are correctly stored."""
+        catchment = Catchment(
+            mean_annual_solid_precip=150.0,
+            temp_gradient=0.8,
+            precip_gradient=0.0005,
+        )
+
+        assert catchment.temp_gradient == 0.8
+        assert catchment.precip_gradient == 0.0005

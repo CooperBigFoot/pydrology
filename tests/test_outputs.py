@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from gr6j import GR6JOutput, ModelOutput, SnowOutput
+from gr6j import GR6JOutput, ModelOutput, SnowLayerOutputs, SnowOutput
 
 
 class TestGR6JOutput:
@@ -173,6 +173,81 @@ class TestSnowOutput:
         field_count = len(fields(SnowOutput))
 
         assert field_count == 12
+
+
+class TestSnowLayerOutputs:
+    """Tests for the SnowLayerOutputs frozen dataclass."""
+
+    def test_creates_with_all_fields(self) -> None:
+        """Test creation with all layer output fields."""
+        n_time = 5
+        n_layers = 3
+        output = SnowLayerOutputs(
+            layer_elevations=np.array([500.0, 1000.0, 1500.0]),
+            layer_fractions=np.array([1 / 3, 1 / 3, 1 / 3]),
+            snow_pack=np.zeros((n_time, n_layers)),
+            snow_thermal_state=np.zeros((n_time, n_layers)),
+            snow_gratio=np.zeros((n_time, n_layers)),
+            snow_melt=np.zeros((n_time, n_layers)),
+            snow_pliq_and_melt=np.zeros((n_time, n_layers)),
+            layer_temp=np.zeros((n_time, n_layers)),
+            layer_precip=np.zeros((n_time, n_layers)),
+        )
+
+        assert output.n_layers == 3
+
+    def test_n_layers_property(self) -> None:
+        """n_layers property returns correct number."""
+        output = SnowLayerOutputs(
+            layer_elevations=np.array([500.0, 1000.0, 1500.0, 2000.0, 2500.0]),
+            layer_fractions=np.full(5, 0.2),
+            snow_pack=np.zeros((3, 5)),
+            snow_thermal_state=np.zeros((3, 5)),
+            snow_gratio=np.zeros((3, 5)),
+            snow_melt=np.zeros((3, 5)),
+            snow_pliq_and_melt=np.zeros((3, 5)),
+            layer_temp=np.zeros((3, 5)),
+            layer_precip=np.zeros((3, 5)),
+        )
+
+        assert output.n_layers == 5
+
+    def test_to_dict_returns_all_fields(self) -> None:
+        """to_dict contains all 9 fields."""
+        output = SnowLayerOutputs(
+            layer_elevations=np.array([500.0]),
+            layer_fractions=np.array([1.0]),
+            snow_pack=np.zeros((2, 1)),
+            snow_thermal_state=np.zeros((2, 1)),
+            snow_gratio=np.zeros((2, 1)),
+            snow_melt=np.zeros((2, 1)),
+            snow_pliq_and_melt=np.zeros((2, 1)),
+            layer_temp=np.zeros((2, 1)),
+            layer_precip=np.zeros((2, 1)),
+        )
+
+        result = output.to_dict()
+
+        assert len(result) == 9
+        assert "layer_elevations" in result
+        assert "snow_pack" in result
+
+    def test_is_frozen(self) -> None:
+        """SnowLayerOutputs is immutable."""
+        output = SnowLayerOutputs(
+            layer_elevations=np.array([500.0]),
+            layer_fractions=np.array([1.0]),
+            snow_pack=np.zeros((2, 1)),
+            snow_thermal_state=np.zeros((2, 1)),
+            snow_gratio=np.zeros((2, 1)),
+            snow_melt=np.zeros((2, 1)),
+            snow_pliq_and_melt=np.zeros((2, 1)),
+            layer_temp=np.zeros((2, 1)),
+            layer_precip=np.zeros((2, 1)),
+        )
+
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            output.snow_pack = np.ones((2, 1))  # type: ignore[misc]
 
 
 class TestModelOutput:

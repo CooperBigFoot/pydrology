@@ -3,6 +3,7 @@
 This module defines the core data types used by the CemaNeige snow model:
 - CemaNeige: The calibrated model parameters
 - CemaNeigeSingleLayerState: The mutable state variables for single-layer mode
+- CemaNeigeMultiLayerState: The mutable state wrapper for multi-layer mode
 """
 
 from __future__ import annotations
@@ -117,3 +118,48 @@ class CemaNeigeSingleLayerState:
             gthreshold=gthreshold,
             glocalmax=gthreshold,
         )
+
+
+@dataclass
+class CemaNeigeMultiLayerState:
+    """CemaNeige multi-layer model state.
+
+    Wraps multiple single-layer states, one per elevation band.
+    This is mutable since the layer states evolve during simulation.
+
+    Attributes:
+        layer_states: List of single-layer state objects, one per elevation band.
+    """
+
+    layer_states: list[CemaNeigeSingleLayerState]
+
+    @classmethod
+    def initialize(
+        cls,
+        n_layers: int,
+        mean_annual_solid_precip: float,
+    ) -> CemaNeigeMultiLayerState:
+        """Create initial multi-layer state.
+
+        Each layer is initialized independently with the same mean annual
+        solid precipitation. For more accurate initialization, consider
+        adjusting mean_annual_solid_precip per layer based on elevation.
+
+        Args:
+            n_layers: Number of elevation bands.
+            mean_annual_solid_precip: Mean annual solid precipitation [mm/year].
+                Applied uniformly to all layers.
+
+        Returns:
+            Initialized CemaNeigeMultiLayerState with n_layers independent states.
+        """
+        layer_states = [CemaNeigeSingleLayerState.initialize(mean_annual_solid_precip) for _ in range(n_layers)]
+        return cls(layer_states=layer_states)
+
+    def __len__(self) -> int:
+        """Return the number of layers."""
+        return len(self.layer_states)
+
+    def __getitem__(self, index: int) -> CemaNeigeSingleLayerState:
+        """Get a specific layer state by index."""
+        return self.layer_states[index]

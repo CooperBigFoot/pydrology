@@ -25,11 +25,13 @@ strict validation rules to ensure data quality and prevent runtime errors.
 All arrays must be 1-dimensional.
 
 **Valid:**
+
 ```python
 precip = np.array([1.0, 2.0, 3.0])  # Shape: (3,)
 ```
 
 **Invalid:**
+
 ```python
 precip = np.array([[1.0], [2.0]])   # Shape: (2, 1) - 2D array
 ```
@@ -41,12 +43,14 @@ precip = np.array([[1.0], [2.0]])   # Shape: (2, 1) - 2D array
 All provided arrays must have the same length as the `time` array.
 
 **Valid:**
+
 ```python
 time = np.array(['2020-01-01', '2020-01-02'], dtype='datetime64')
 precip = np.array([1.0, 2.0])  # Same length as time
 ```
 
 **Invalid:**
+
 ```python
 time = np.array(['2020-01-01', '2020-01-02'], dtype='datetime64')
 precip = np.array([1.0, 2.0, 3.0])  # Different length
@@ -59,6 +63,7 @@ precip = np.array([1.0, 2.0, 3.0])  # Different length
 NaN values are not allowed in any numeric array (precip, pet, temp).
 
 **Invalid:**
+
 ```python
 precip = np.array([1.0, np.nan, 3.0])
 ```
@@ -71,6 +76,7 @@ requires explicit handling of missing data before simulation.
 ### 4. Type Coercion
 
 **Numeric arrays:** Automatically coerced to `float64`
+
 ```python
 # Input as integers
 precip = np.array([1, 2, 3])  # int64
@@ -79,6 +85,7 @@ assert forcing.precip.dtype == np.float64
 ```
 
 **Time array:** Automatically coerced to `datetime64[ns]`
+
 ```python
 # Input as strings or datetime objects
 time = np.array(['2020-01-01', '2020-01-02'])

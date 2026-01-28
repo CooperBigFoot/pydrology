@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from gr6j import Catchment, CemaNeige, ForcingData, ModelOutput, Parameters, State
-from gr6j.cemaneige import CemaNeigeSingleLayerState
+from gr6j import Catchment, CemaNeige, ForcingData, ModelOutput, Parameters, SnowLayerOutputs, State
+from gr6j.cemaneige import CemaNeigeMultiLayerState, CemaNeigeSingleLayerState
 from gr6j.model.run import run, step
 
 # Expected flux keys returned by step() - all 20 MISC outputs
@@ -610,3 +610,167 @@ class TestRunWithSnow:
 
         for key, values in result.snow.to_dict().items():
             assert np.all(np.isfinite(values)), f"Snow field '{key}' has non-finite values"
+
+
+class TestRunWithMultiLayerSnow:
+    """Tests for run() with multi-layer CemaNeige snow simulation."""
+
+    @pytest.fixture
+    def snow_params(self) -> Parameters:
+        """GR6J parameters with CemaNeige snow module."""
+        return Parameters(
+            x1=350.0,
+            x2=0.0,
+            x3=90.0,
+            x4=1.7,
+            x5=0.0,
+            x6=5.0,
+            snow=CemaNeige(ctg=0.97, kf=2.5),
+        )
+
+    @pytest.fixture
+    def multi_layer_catchment(self) -> Catchment:
+        """5-layer catchment with hypsometric curve."""
+        return Catchment(
+            mean_annual_solid_precip=150.0,
+            n_layers=5,
+            hypsometric_curve=np.linspace(200.0, 2000.0, 101),
+            input_elevation=500.0,
+        )
+
+    @pytest.fixture
+    def forcing_with_temp(self) -> ForcingData:
+        """10-day forcing with temperature."""
+        return ForcingData(
+            time=pd.date_range("2020-01-01", periods=10, freq="D").values,
+            precip=np.array([10.0, 15.0, 5.0, 0.0, 20.0, 10.0, 0.0, 5.0, 15.0, 8.0]),
+            pet=np.array([2.0, 3.0, 4.0, 5.0, 2.0, 3.0, 4.0, 3.0, 2.0, 3.0]),
+            temp=np.array([-5.0, -3.0, 0.0, 5.0, -8.0, -2.0, 3.0, 7.0, -1.0, 10.0]),
+        )
+
+    def test_produces_snow_layer_outputs(
+        self,
+        snow_params: Parameters,
+        multi_layer_catchment: Catchment,
+        forcing_with_temp: ForcingData,
+    ) -> None:
+        """Multi-layer run produces snow_layers output."""
+        result = run(snow_params, forcing_with_temp, catchment=multi_layer_catchment)
+
+        assert result.snow_layers is not None
+        assert isinstance(result.snow_layers, SnowLayerOutputs)
+
+    def test_snow_layers_has_correct_shape(
+        self,
+        snow_params: Parameters,
+        multi_layer_catchment: Catchment,
+        forcing_with_temp: ForcingData,
+    ) -> None:
+        """Snow layer arrays have shape (n_timesteps, n_layers)."""
+        result = run(snow_params, forcing_with_temp, catchment=multi_layer_catchment)
+
+        assert result.snow_layers.snow_pack.shape == (10, 5)
+        assert result.snow_layers.snow_melt.shape == (10, 5)
+        assert result.snow_layers.layer_temp.shape == (10, 5)
+        assert result.snow_layers.layer_precip.shape == (10, 5)
+
+    def test_snow_layers_n_layers_property(
+        self,
+        snow_params: Parameters,
+        multi_layer_catchment: Catchment,
+        forcing_with_temp: ForcingData,
+    ) -> None:
+        """n_layers property returns correct count."""
+        result = run(snow_params, forcing_with_temp, catchment=multi_layer_catchment)
+
+        assert result.snow_layers.n_layers == 5
+
+    def test_aggregated_snow_output_still_present(
+        self,
+        snow_params: Parameters,
+        multi_layer_catchment: Catchment,
+        forcing_with_temp: ForcingData,
+    ) -> None:
+        """Aggregated SnowOutput is still present alongside layer outputs."""
+        result = run(snow_params, forcing_with_temp, catchment=multi_layer_catchment)
+
+        assert result.snow is not None
+        assert len(result.snow.snow_pack) == 10
+
+    def test_all_values_finite(
+        self,
+        snow_params: Parameters,
+        multi_layer_catchment: Catchment,
+        forcing_with_temp: ForcingData,
+    ) -> None:
+        """All output values are finite."""
+        result = run(snow_params, forcing_with_temp, catchment=multi_layer_catchment)
+
+        for key, values in result.gr6j.to_dict().items():
+            assert np.all(np.isfinite(values)), f"GR6J '{key}' has non-finite"
+
+        for key, values in result.snow.to_dict().items():
+            assert np.all(np.isfinite(values)), f"Snow '{key}' has non-finite"
+
+        assert np.all(np.isfinite(result.snow_layers.snow_pack))
+        assert np.all(np.isfinite(result.snow_layers.layer_temp))
+
+    def test_higher_layers_colder_temperatures(
+        self,
+        snow_params: Parameters,
+        multi_layer_catchment: Catchment,
+        forcing_with_temp: ForcingData,
+    ) -> None:
+        """Higher elevation layers have colder temperatures."""
+        result = run(snow_params, forcing_with_temp, catchment=multi_layer_catchment)
+
+        # Check first timestep: layers should have decreasing temperature
+        layer_temps = result.snow_layers.layer_temp[0, :]
+        for i in range(len(layer_temps) - 1):
+            assert layer_temps[i] > layer_temps[i + 1]
+
+    def test_single_layer_has_no_layer_outputs(
+        self,
+        snow_params: Parameters,
+        forcing_with_temp: ForcingData,
+    ) -> None:
+        """Single-layer catchment produces no snow_layers output."""
+        catchment = Catchment(mean_annual_solid_precip=150.0)
+        result = run(snow_params, forcing_with_temp, catchment=catchment)
+
+        assert result.snow_layers is None
+
+    def test_custom_initial_multi_layer_state(
+        self,
+        snow_params: Parameters,
+        multi_layer_catchment: Catchment,
+        forcing_with_temp: ForcingData,
+    ) -> None:
+        """Custom initial multi-layer state is respected."""
+        custom_state = CemaNeigeMultiLayerState.initialize(n_layers=5, mean_annual_solid_precip=150.0)
+        # Give first layer some snow
+        custom_state[0].g = 100.0
+
+        result = run(
+            snow_params,
+            forcing_with_temp,
+            catchment=multi_layer_catchment,
+            initial_snow_state=custom_state,
+        )
+
+        # First layer should have more snow at start
+        assert result.snow_layers.snow_pack[0, 0] > result.snow_layers.snow_pack[0, 1]
+
+    def test_layer_elevations_stored_in_output(
+        self,
+        snow_params: Parameters,
+        multi_layer_catchment: Catchment,
+        forcing_with_temp: ForcingData,
+    ) -> None:
+        """Layer elevations are stored in the output."""
+        result = run(snow_params, forcing_with_temp, catchment=multi_layer_catchment)
+
+        assert len(result.snow_layers.layer_elevations) == 5
+        # Elevations should be monotonically increasing
+        for i in range(4):
+            assert result.snow_layers.layer_elevations[i] < result.snow_layers.layer_elevations[i + 1]

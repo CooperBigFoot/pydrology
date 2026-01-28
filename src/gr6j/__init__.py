@@ -6,21 +6,30 @@ Génie Rural à 6 paramètres Journalier.
 Includes optional CemaNeige snow module for cold-climate catchments.
 """
 
-from .cemaneige import CemaNeige, CemaNeigeSingleLayerState, cemaneige_step
+from .cemaneige import (
+    CemaNeige,
+    CemaNeigeMultiLayerState,
+    CemaNeigeSingleLayerState,
+    cemaneige_multi_layer_step,
+    cemaneige_step,
+)
 from .inputs import Catchment, ForcingData
 from .model import Parameters, State, run, step
-from .outputs import GR6JOutput, ModelOutput, SnowOutput
+from .outputs import GR6JOutput, ModelOutput, SnowLayerOutputs, SnowOutput
 
 __all__ = [
     "Catchment",
     "CemaNeige",
+    "CemaNeigeMultiLayerState",
     "CemaNeigeSingleLayerState",
     "ForcingData",
     "GR6JOutput",
     "ModelOutput",
     "Parameters",
+    "SnowLayerOutputs",
     "SnowOutput",
     "State",
+    "cemaneige_multi_layer_step",
     "cemaneige_step",
     "run",
     "step",

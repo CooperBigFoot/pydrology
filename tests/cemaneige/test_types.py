@@ -8,7 +8,7 @@ import logging
 
 import pytest
 
-from gr6j.cemaneige.types import CemaNeige, CemaNeigeSingleLayerState
+from gr6j.cemaneige.types import CemaNeige, CemaNeigeMultiLayerState, CemaNeigeSingleLayerState
 
 
 class TestCemaNeige:
@@ -196,3 +196,62 @@ class TestCemaNeigeSingleLayerState:
         assert hasattr(state, "etg")
         assert hasattr(state, "gthreshold")
         assert hasattr(state, "glocalmax")
+
+
+class TestCemaNeigeMultiLayerState:
+    """Tests for the CemaNeigeMultiLayerState multi-layer wrapper."""
+
+    def test_initialize_creates_correct_number_of_layers(self) -> None:
+        """Initialize creates the expected number of layer states."""
+        state = CemaNeigeMultiLayerState.initialize(n_layers=5, mean_annual_solid_precip=150.0)
+
+        assert len(state) == 5
+
+    def test_initialize_each_layer_has_zero_snow(self) -> None:
+        """Each layer starts with zero snow pack."""
+        state = CemaNeigeMultiLayerState.initialize(n_layers=3, mean_annual_solid_precip=150.0)
+
+        for i in range(3):
+            assert state[i].g == 0.0
+
+    def test_initialize_each_layer_has_correct_gthreshold(self) -> None:
+        """Each layer's gthreshold is 0.9 * mean_annual_solid_precip."""
+        state = CemaNeigeMultiLayerState.initialize(n_layers=3, mean_annual_solid_precip=200.0)
+
+        for i in range(3):
+            assert state[i].gthreshold == pytest.approx(0.9 * 200.0)
+
+    def test_getitem_returns_layer_state(self) -> None:
+        """Indexing returns individual CemaNeigeSingleLayerState."""
+        state = CemaNeigeMultiLayerState.initialize(n_layers=3, mean_annual_solid_precip=150.0)
+
+        layer = state[0]
+        assert isinstance(layer, CemaNeigeSingleLayerState)
+
+    def test_layer_states_are_independent(self) -> None:
+        """Modifying one layer doesn't affect others."""
+        state = CemaNeigeMultiLayerState.initialize(n_layers=3, mean_annual_solid_precip=150.0)
+
+        state[0].g = 100.0
+
+        assert state[0].g == 100.0
+        assert state[1].g == 0.0
+        assert state[2].g == 0.0
+
+    def test_creates_with_direct_layer_states(self) -> None:
+        """Can be created directly from a list of layer states."""
+        layers = [
+            CemaNeigeSingleLayerState(g=10.0, etg=-1.0, gthreshold=100.0, glocalmax=100.0),
+            CemaNeigeSingleLayerState(g=20.0, etg=-2.0, gthreshold=100.0, glocalmax=100.0),
+        ]
+        state = CemaNeigeMultiLayerState(layer_states=layers)
+
+        assert len(state) == 2
+        assert state[0].g == 10.0
+        assert state[1].g == 20.0
+
+    def test_single_layer_initialization(self) -> None:
+        """Works correctly with n_layers=1."""
+        state = CemaNeigeMultiLayerState.initialize(n_layers=1, mean_annual_solid_precip=150.0)
+
+        assert len(state) == 1

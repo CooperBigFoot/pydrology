@@ -154,18 +154,31 @@ Static catchment properties required for the snow module.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `mean_annual_solid_precip` | `float` | Yes | Mean annual solid precipitation [mm/year] |
-| `hypsometric_curve` | `np.ndarray` | No | Elevation distribution (future multi-layer support) |
-| `input_elevation` | `float` | No | Elevation of forcing data [m] (future) |
+| `hypsometric_curve` | `np.ndarray` | No* | 101-point elevation distribution [m] |
+| `input_elevation` | `float` | No* | Elevation of forcing data [m] |
 | `n_layers` | `int` | No | Number of elevation bands (default: 1) |
+| `temp_gradient` | `float` | No | Temperature lapse rate [deg C/100m]. Default: 0.6 |
+| `precip_gradient` | `float` | No | Precipitation gradient [m^-1]. Default: 0.00041 |
+
+*Required when `n_layers > 1`.
 
 **Example:**
 
 ```python
 from gr6j import Catchment
 
-# Basic catchment
+# Basic catchment (single layer)
 catchment = Catchment(
     mean_annual_solid_precip=150.0,  # [mm/year]
+)
+
+# Multi-layer catchment (5 elevation bands)
+import numpy as np
+catchment_ml = Catchment(
+    mean_annual_solid_precip=150.0,
+    n_layers=5,
+    hypsometric_curve=np.linspace(200.0, 2000.0, 101),
+    input_elevation=500.0,
 )
 ```
 
@@ -287,7 +300,7 @@ def run(
     forcing: ForcingData,
     catchment: Catchment | None = None,
     initial_state: State | None = None,
-    initial_snow_state: CemaNeigeSingleLayerState | None = None,
+    initial_snow_state: CemaNeigeSingleLayerState | CemaNeigeMultiLayerState | None = None,
 ) -> ModelOutput:
 ```
 
@@ -299,7 +312,7 @@ def run(
 | `forcing` | `ForcingData` | Yes | Input forcing data |
 | `catchment` | `Catchment` | No* | Catchment properties |
 | `initial_state` | `State` | No | Initial GR6J state |
-| `initial_snow_state` | `CemaNeigeSingleLayerState` | No | Initial snow state |
+| `initial_snow_state` | `CemaNeigeSingleLayerState \| CemaNeigeMultiLayerState` | No | Initial snow state |
 
 *Required when snow module is enabled.
 
@@ -371,6 +384,7 @@ The `run()` function returns a `ModelOutput` object that provides access to all 
 | `time` | `np.ndarray` | Datetime array for each timestep |
 | `gr6j` | `GR6JOutput` | GR6J model outputs |
 | `snow` | `SnowOutput` or `None` | CemaNeige outputs (if snow enabled) |
+| `snow_layers` | `SnowLayerOutputs` or `None` | Per-layer snow outputs (if multi-layer enabled) |
 
 **Methods:**
 
@@ -455,6 +469,35 @@ if output.snow is not None:
 
     # Convert to dictionary
     snow_dict = output.snow.to_dict()
+```
+
+### SnowLayerOutputs (Multi-Layer)
+
+Per-layer snow outputs for multi-layer simulations. Contains 2D arrays with shape `(n_timesteps, n_layers)`.
+
+| Field | Description | Shape |
+|-------|-------------|-------|
+| `layer_elevations` | Representative elevation of each layer [m] | (n_layers,) |
+| `layer_fractions` | Area fraction of each layer [-] | (n_layers,) |
+| `snow_pack` | Snow pack per layer [mm] | (n_timesteps, n_layers) |
+| `snow_thermal_state` | Thermal state per layer [deg C] | (n_timesteps, n_layers) |
+| `snow_gratio` | Snow cover fraction per layer [-] | (n_timesteps, n_layers) |
+| `snow_melt` | Actual melt per layer [mm/day] | (n_timesteps, n_layers) |
+| `snow_pliq_and_melt` | Total liquid output per layer [mm/day] | (n_timesteps, n_layers) |
+| `layer_temp` | Extrapolated temperature per layer [deg C] | (n_timesteps, n_layers) |
+| `layer_precip` | Extrapolated precipitation per layer [mm/day] | (n_timesteps, n_layers) |
+
+**Example:**
+
+```python
+output = run(params, forcing, catchment=catchment_ml)
+
+if output.snow_layers is not None:
+    # Per-layer data
+    layer_snow = output.snow_layers.snow_pack       # (n_timesteps, 5)
+    layer_temps = output.snow_layers.layer_temp      # (n_timesteps, 5)
+    elevations = output.snow_layers.layer_elevations  # (5,)
+    print(f"Layer elevations: {elevations}")
 ```
 
 ### Converting to DataFrame
@@ -551,6 +594,60 @@ custom_snow_state = CemaNeigeSingleLayerState(
 )
 
 output = run(params, forcing, catchment=catchment, initial_snow_state=custom_snow_state)
+```
+
+### Multi-Layer Snow Simulation
+
+For better representation of snow processes in mountainous catchments, CemaNeige supports multiple elevation bands:
+
+```python
+import numpy as np
+from gr6j import Catchment, CemaNeige, CemaNeigeMultiLayerState, ForcingData, Parameters, run
+
+# Define multi-layer catchment
+catchment = Catchment(
+    mean_annual_solid_precip=150.0,
+    n_layers=5,
+    hypsometric_curve=np.linspace(200.0, 2000.0, 101),
+    input_elevation=500.0,
+)
+
+params = Parameters(
+    x1=350, x2=0, x3=90, x4=1.7, x5=0, x6=5,
+    snow=CemaNeige(ctg=0.97, kf=2.5),
+)
+
+forcing = ForcingData(
+    time=time_arr,
+    precip=precip_arr,
+    pet=pet_arr,
+    temp=temp_arr,
+)
+
+output = run(params, forcing, catchment=catchment)
+
+# Aggregated output (area-weighted average across layers)
+print(output.snow.snow_pack)  # 1D array
+
+# Per-layer output
+print(output.snow_layers.snow_pack)   # 2D array: (n_timesteps, 5)
+print(output.snow_layers.layer_temp)  # 2D array: (n_timesteps, 5)
+```
+
+Each layer runs an independent CemaNeige instance with temperature and precipitation extrapolated using elevation gradients. The aggregated output (`output.snow`) is the area-weighted average, while `output.snow_layers` provides per-layer detail.
+
+**Custom initial state:**
+
+```python
+from gr6j import CemaNeigeMultiLayerState
+
+# Initialize multi-layer snow state
+initial_state = CemaNeigeMultiLayerState.initialize(
+    n_layers=5,
+    mean_annual_solid_precip=150.0,
+)
+
+output = run(params, forcing, catchment=catchment, initial_snow_state=initial_state)
 ```
 
 ### How Snow Module Works
@@ -734,6 +831,39 @@ from gr6j import Catchment
 
 catchment = Catchment(mean_annual_solid_precip=150.0)
 output = run(params, forcing, catchment=catchment)  # Pass catchment!
+```
+
+### "hypsometric_curve is required when n_layers > 1"
+
+**Cause:** You set `n_layers > 1` but did not provide a hypsometric curve.
+
+**Solution:** Provide a 101-point hypsometric curve:
+
+```python
+import numpy as np
+from gr6j import Catchment
+
+catchment = Catchment(
+    mean_annual_solid_precip=150.0,
+    n_layers=5,
+    hypsometric_curve=np.linspace(200.0, 2000.0, 101),  # 101 points!
+    input_elevation=500.0,
+)
+```
+
+### "input_elevation is required when n_layers > 1"
+
+**Cause:** You set `n_layers > 1` but did not provide the forcing station elevation.
+
+**Solution:** Add `input_elevation` to your Catchment:
+
+```python
+catchment = Catchment(
+    mean_annual_solid_precip=150.0,
+    n_layers=5,
+    hypsometric_curve=np.linspace(200.0, 2000.0, 101),
+    input_elevation=500.0,  # Add this!
+)
 ```
 
 ### "precip array contains NaN values"

@@ -134,6 +134,24 @@ print(output.gr6j.streamflow)      # Total streamflow [mm/day]
 
 When snow is enabled, `output.snow` contains 12 fields (11 CemaNeige + 1 precip_raw). Use `output.to_dataframe()` to get all 32 columns.
 
+#### Multi-Layer Elevation Bands
+
+For mountainous catchments, enable semi-distributed snow simulation with multiple elevation bands:
+
+```python
+catchment = Catchment(
+    mean_annual_solid_precip=150.0,
+    n_layers=5,
+    hypsometric_curve=np.linspace(200.0, 2000.0, 101),
+    input_elevation=500.0,
+)
+
+output = run(params, forcing, catchment=catchment)
+
+# Per-layer outputs available via output.snow_layers
+print(output.snow_layers.snow_pack.shape)  # (n_timesteps, 5)
+```
+
 ### Single Timestep Execution
 
 ```python
