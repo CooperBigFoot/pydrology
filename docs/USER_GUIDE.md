@@ -958,6 +958,27 @@ The warmup period allows model stores to reach dynamic equilibrium before evalua
 
 **Important:** `len(observed) == len(forcing) - warmup` must hold.
 
+**Note:** The `observed` data must contain **only** the post-warmup period. If your observed data includes the warmup period (e.g., same length as forcing), you must slice it before passing to `calibrate()`:
+
+```python
+warmup = 365
+
+# If observed covers the full period (including warmup), slice it:
+observed = ObservedData(
+    time=full_observed_time[warmup:],
+    streamflow=full_observed_streamflow[warmup:],
+)
+
+result = calibrate(
+    forcing=forcing,       # Full period (warmup + calibration)
+    observed=observed,     # Post-warmup only
+    warmup=warmup,
+    ...
+)
+```
+
+Passing observed data that includes the warmup period will raise a `ValueError`.
+
 ### Early Stopping via Callback
 
 Monitor optimization progress and stop early if needed:
