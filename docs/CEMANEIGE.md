@@ -261,6 +261,12 @@ $$f_{solid} = \begin{cases}
 0 & \text{if } T \geq 3°C
 \end{cases}$$
 
+> **Tip:** Use the `compute_solid_fraction()` utility to compute solid fractions for your forcing data:
+> ```python
+> from gr6j.utils import compute_solid_fraction
+> solid_frac = compute_solid_fraction(temp_array)
+> ```
+
 ---
 
 ### 5.2 Snow Accumulation
@@ -777,14 +783,22 @@ This requires:
 
 ### MeanAnSolidPrecip Calculation
 
-The annual mean solid precipitation must be computed for each elevation band:
+The annual mean solid precipitation is required for CemaNeige initialization. Use the utility function to compute it from your forcing data:
 
 ```python
-# For each layer, compute mean daily solid precip over calibration period
-mean_daily_solid = mean(frac_solid[cal_period] * precip[cal_period])
-# Convert to annual
-mean_annual_solid = mean_daily_solid * 365.25
+from gr6j.utils import compute_mean_annual_solid_precip
+
+# Compute from calibration period data
+mean_annual_solid = compute_mean_annual_solid_precip(
+    precip=precip_array,  # Daily precipitation [mm/day]
+    temp=temp_array,      # Daily temperature [°C]
+)
+
+# Use in Catchment configuration
+catchment = Catchment(mean_annual_solid_precip=mean_annual_solid)
 ```
+
+The utility uses the USACE formula (Section 5.1) with default thresholds T_snow=-1°C and T_rain=3°C, and converts mean daily solid precipitation to annual by multiplying by 365.25.
 
 ---
 

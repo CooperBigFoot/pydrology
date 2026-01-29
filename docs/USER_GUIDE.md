@@ -875,6 +875,120 @@ The `input_elevation` parameter for `Catchment` should be the elevation where yo
 
 ---
 
+### Solid Precipitation Utilities
+
+The solid precipitation utilities compute the fraction and amount of precipitation falling as snow using the USACE (US Army Corps of Engineers) formula. These are useful for:
+
+- Estimating `mean_annual_solid_precip` for CemaNeige configuration
+- Analyzing snow climatology for a basin
+- Pre-processing forcing data for snow-dominated catchments
+
+**USACE Formula:**
+
+The solid fraction is computed as a linear function of temperature:
+
+$$f_{solid} = \begin{cases}
+1 & \text{if } T \leq T_{snow} \\
+\frac{T_{rain} - T}{T_{rain} - T_{snow}} & \text{if } T_{snow} < T < T_{rain} \\
+0 & \text{if } T \geq T_{rain}
+\end{cases}$$
+
+With default thresholds $T_{snow} = -1°C$ and $T_{rain} = 3°C$.
+
+#### compute_solid_fraction
+
+Compute the fraction of precipitation falling as snow.
+
+```python
+from gr6j.utils import compute_solid_fraction
+import numpy as np
+
+temp = np.array([-5.0, 0.0, 1.0, 5.0])  # °C
+fraction = compute_solid_fraction(temp)
+print(fraction)  # [1.0, 0.75, 0.5, 0.0]
+```
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `temp` | `np.ndarray` | required | Temperature array [°C] |
+| `t_snow` | `float` | -1.0 | All-snow threshold [°C] |
+| `t_rain` | `float` | 3.0 | All-rain threshold [°C] |
+
+**Returns:** `np.ndarray` - Solid fraction values in [0, 1]
+
+#### compute_solid_precip
+
+Compute solid precipitation from total precipitation and temperature.
+
+```python
+from gr6j.utils import compute_solid_precip
+import numpy as np
+
+precip = np.array([10.0, 10.0, 10.0, 10.0])  # mm/day
+temp = np.array([-5.0, 0.0, 1.0, 5.0])       # °C
+solid = compute_solid_precip(precip, temp)
+print(solid)  # [10.0, 7.5, 5.0, 0.0]
+```
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `precip` | `np.ndarray` | required | Total precipitation [mm/day] |
+| `temp` | `np.ndarray` | required | Temperature [°C] |
+| `t_snow` | `float` | -1.0 | All-snow threshold [°C] |
+| `t_rain` | `float` | 3.0 | All-rain threshold [°C] |
+
+**Returns:** `np.ndarray` - Solid precipitation [mm/day]
+
+#### compute_mean_annual_solid_precip
+
+Compute mean annual solid precipitation for CemaNeige configuration.
+
+```python
+from gr6j.utils import compute_mean_annual_solid_precip
+import numpy as np
+
+# Load your forcing data (example with 3 years of daily data)
+precip = np.random.uniform(0, 20, 365 * 3)  # mm/day
+temp = np.random.uniform(-10, 25, 365 * 3)  # °C
+
+mean_annual = compute_mean_annual_solid_precip(precip, temp)
+print(f"Mean annual solid precip: {mean_annual:.1f} mm/year")
+```
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `precip` | `np.ndarray` | required | Daily precipitation [mm/day] |
+| `temp` | `np.ndarray` | required | Daily temperature [°C] |
+| `t_snow` | `float` | -1.0 | All-snow threshold [°C] |
+| `t_rain` | `float` | 3.0 | All-rain threshold [°C] |
+
+**Returns:** `float` - Mean annual solid precipitation [mm/year]
+
+**Integration with Catchment:**
+
+```python
+from gr6j import Catchment, CemaNeige, ForcingData, Parameters, run
+from gr6j.utils import compute_mean_annual_solid_precip
+
+# Compute from historical forcing data
+mean_annual_solid = compute_mean_annual_solid_precip(
+    precip=historical_precip,
+    temp=historical_temp,
+)
+
+# Use in Catchment configuration
+catchment = Catchment(mean_annual_solid_precip=mean_annual_solid)
+
+params = Parameters(
+    x1=350, x2=0, x3=90, x4=1.7, x5=0, x6=5,
+    snow=CemaNeige(ctg=0.97, kf=2.5),
+)
+
+output = run(params, forcing, catchment=catchment)
+```
+
+---
+
 ## Calibration
 
 The GR6J package includes automatic parameter calibration using evolutionary algorithms via the [ctrl-freak](https://github.com/hydrosolutions/ctrl-freak) library.
@@ -1265,6 +1379,39 @@ if not Path(dem_path).exists():
 ```bash
 # Check raster info with GDAL
 gdalinfo basin_dem.tif
+```
+
+### "precip shape ... does not match temp shape ..."
+
+**Cause:** The precipitation and temperature arrays passed to solid precipitation utilities have different shapes.
+
+**Solution:** Ensure both arrays have the same shape:
+
+```python
+import numpy as np
+
+# Check shapes before calling
+print(f"precip shape: {precip.shape}")
+print(f"temp shape: {temp.shape}")
+
+# Ensure they match
+assert precip.shape == temp.shape, "Arrays must have the same shape"
+```
+
+### "t_snow must be less than t_rain"
+
+**Cause:** The snow temperature threshold is greater than or equal to the rain threshold in solid precipitation utilities.
+
+**Solution:** Ensure `t_snow < t_rain`:
+
+```python
+from gr6j.utils import compute_solid_fraction
+
+# Correct: t_snow < t_rain
+fraction = compute_solid_fraction(temp, t_snow=-1.0, t_rain=3.0)
+
+# Wrong: t_snow >= t_rain will raise ValueError
+# fraction = compute_solid_fraction(temp, t_snow=3.0, t_rain=-1.0)
 ```
 
 ---
