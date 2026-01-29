@@ -11,8 +11,9 @@ A complete guide to using the GR6J hydrological model Python implementation.
 5. [Model Outputs](#model-outputs)
 6. [Snow Module](#snow-module)
 7. [Advanced Usage](#advanced-usage)
-8. [Calibration](#calibration)
-9. [Common Errors](#common-errors)
+8. [Utilities](#utilities)
+9. [Calibration](#calibration)
+10. [Common Errors](#common-errors)
 
 ---
 
@@ -155,7 +156,7 @@ Static catchment properties required for the snow module.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `mean_annual_solid_precip` | `float` | Yes | Mean annual solid precipitation [mm/year] |
-| `hypsometric_curve` | `np.ndarray` | No* | 101-point elevation distribution [m] |
+| `hypsometric_curve` | `np.ndarray` | No* | 101-point elevation distribution [m]. Use `analyze_dem()` to compute from a DEM. |
 | `input_elevation` | `float` | No* | Elevation of forcing data [m] |
 | `n_layers` | `int` | No | Number of elevation bands (default: 1) |
 | `temp_gradient` | `float` | No | Temperature lapse rate [deg C/100m]. Default: 0.6 |
@@ -804,6 +805,76 @@ output = run(params, full_forcing)
 
 ---
 
+## Utilities
+
+### DEM Analysis
+
+The `analyze_dem()` utility computes elevation statistics from a basin-clipped DEM raster file. This is particularly useful for setting up multi-layer CemaNeige simulations.
+
+**Basic usage:**
+
+```python
+from gr6j.utils import analyze_dem
+
+dem = analyze_dem("data/my_basin_dem.tif")
+print(dem)
+# DEMStatistics(
+#   min_elevation=452.30,
+#   max_elevation=2147.80,
+#   mean_elevation=1203.50,
+#   median_elevation=1156.20,
+#   hypsometric_curve=<array shape=(101,)>
+# )
+```
+
+**Using with CemaNeige multi-layer:**
+
+```python
+from gr6j import Catchment, CemaNeige, Parameters
+from gr6j.utils import analyze_dem
+
+# Analyze the DEM
+dem = analyze_dem("data/basin_dem.tif")
+
+# Configure multi-layer catchment using DEM statistics
+catchment = Catchment(
+    mean_annual_solid_precip=150.0,
+    n_layers=5,
+    hypsometric_curve=dem.hypsometric_curve,
+    input_elevation=dem.median_elevation,  # Or use station elevation if known
+)
+
+params = Parameters(
+    x1=350, x2=0, x3=90, x4=1.7, x5=0, x6=5,
+    snow=CemaNeige(ctg=0.97, kf=2.5),
+)
+```
+
+**DEMStatistics attributes:**
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `min_elevation` | `float` | Minimum elevation in the DEM [m] |
+| `max_elevation` | `float` | Maximum elevation in the DEM [m] |
+| `mean_elevation` | `float` | Mean elevation [m] |
+| `median_elevation` | `float` | Median elevation [m] |
+| `hypsometric_curve` | `np.ndarray` | 101-point elevation percentiles (0-100%) [m] |
+
+**Choosing `input_elevation`:**
+
+The `input_elevation` parameter for `Catchment` should be the elevation where your forcing data (precipitation, temperature) was measured. Options:
+
+1. **Weather station elevation** (recommended) - If you know where your forcing data comes from
+2. **Median elevation** (`dem.median_elevation`) - A reasonable default if station elevation is unknown
+3. **Mean elevation** (`dem.mean_elevation`) - Alternative default
+
+**Supported formats:**
+
+- GeoTIFF (`.tif`, `.tiff`) - recommended
+- Any raster format supported by GDAL/rasterio
+
+---
+
 ## Calibration
 
 The GR6J package includes automatic parameter calibration using evolutionary algorithms via the [ctrl-freak](https://github.com/hydrosolutions/ctrl-freak) library.
@@ -1164,6 +1235,36 @@ logging.getLogger("gr6j").setLevel(logging.ERROR)
 x1_value = 3000.0
 if x1_value < 1.0 or x1_value > 2500.0:
     print(f"Warning: x1={x1_value} is outside typical range [1, 2500]")
+```
+
+### "DEM file not found: ..."
+
+**Cause:** The specified DEM file path does not exist.
+
+**Solution:** Check that the file path is correct:
+
+```python
+from pathlib import Path
+
+dem_path = "data/basin_dem.tif"
+if not Path(dem_path).exists():
+    print(f"File not found: {dem_path}")
+# Check for typos or use absolute path
+```
+
+### "All pixels are NoData or invalid"
+
+**Cause:** The DEM file contains no valid elevation data - all pixels are NoData, NaN, or infinity.
+
+**Solution:** Check your DEM file:
+
+1. Verify the DEM was clipped correctly to the catchment boundary
+2. Check the NoData value is set correctly in the raster metadata
+3. Open the file in GIS software (QGIS) to inspect visually
+
+```bash
+# Check raster info with GDAL
+gdalinfo basin_dem.tif
 ```
 
 ---

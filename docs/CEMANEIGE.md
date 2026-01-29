@@ -590,6 +590,8 @@ CemaNeige supports **multi-layer elevation bands** to account for temperature an
 | Hypsometric curve | 101-point elevation distribution (percentiles 0-100%) |
 | Equal area bands | Each layer represents 1/N of the catchment area |
 
+> **Tip:** Use the `analyze_dem()` utility to automatically compute the hypsometric curve from a basin-clipped DEM file. See [Section 10.7](#107-dem-requirements) for details.
+
 ### 10.2 Layer Derivation
 
 Layers are derived from the hypsometric curve (cumulative elevation distribution):
@@ -642,23 +644,27 @@ All flux variables are aggregated the same way (snow_pack, snow_melt, etc.).
 ```python
 import numpy as np
 from gr6j import Catchment, CemaNeige, ForcingData, Parameters, run
+from gr6j.utils import analyze_dem
 
-# Define 5-layer catchment with hypsometric curve
+# Analyze basin DEM to get hypsometric curve
+dem = analyze_dem("data/basin_dem.tif")
+
+# Define 5-layer catchment using DEM statistics
 catchment = Catchment(
     mean_annual_solid_precip=150.0,
     n_layers=5,
-    hypsometric_curve=np.linspace(200.0, 2000.0, 101),  # 101 points
-    input_elevation=500.0,  # Elevation of forcing station [m]
+    hypsometric_curve=dem.hypsometric_curve,  # From DEM analysis
+    input_elevation=dem.median_elevation,      # Or use known station elevation
 )
 
-# Optional: custom gradients (defaults used if None)
+# Optional: custom gradients (defaults used if not specified)
 catchment_custom = Catchment(
     mean_annual_solid_precip=150.0,
     n_layers=5,
-    hypsometric_curve=np.linspace(200.0, 2000.0, 101),
-    input_elevation=500.0,
-    temp_gradient=0.8,       # Custom lapse rate [°C/100m]
-    precip_gradient=0.0005,  # Custom precip gradient [m⁻¹]
+    hypsometric_curve=dem.hypsometric_curve,
+    input_elevation=500.0,           # Known station elevation [m]
+    temp_gradient=0.8,               # Custom lapse rate [°C/100m]
+    precip_gradient=0.0005,          # Custom precip gradient [m⁻¹]
 )
 
 params = Parameters(
@@ -684,6 +690,55 @@ print(output.snow_layers.snow_pack)  # Shape: (365, 5)
 print(output.snow_layers.layer_temp) # Shape: (365, 5)
 print(output.snow_layers.layer_elevations)  # Shape: (5,)
 ```
+
+### 10.7 DEM Requirements
+
+The `analyze_dem()` utility requires a DEM raster file clipped to the catchment boundary.
+
+**Requirements:**
+
+| Aspect | Requirement |
+|--------|-------------|
+| Format | GeoTIFF (`.tif`) or any GDAL-supported raster |
+| Coverage | Must be clipped to catchment boundary |
+| NoData | NoData value should be set in raster metadata |
+| Resolution | Any resolution (finer is better for accuracy) |
+
+**Preparing a DEM:**
+
+1. **Obtain a DEM** - SRTM, ASTER, national elevation datasets, or LiDAR
+2. **Clip to catchment boundary** using GDAL or GIS software
+
+**GDAL command to clip a DEM:**
+
+```bash
+gdalwarp -cutline catchment.shp -crop_to_cutline -dstnodata -9999 dem.tif basin_dem.tif
+```
+
+Where:
+- `catchment.shp` - Shapefile of the catchment boundary
+- `dem.tif` - Source DEM covering the region
+- `basin_dem.tif` - Output clipped DEM
+
+**Python usage:**
+
+```python
+from gr6j.utils import analyze_dem
+
+dem = analyze_dem("data/basin_dem.tif")
+
+print(f"Elevation range: {dem.min_elevation:.1f} - {dem.max_elevation:.1f} m")
+print(f"Mean elevation: {dem.mean_elevation:.1f} m")
+print(f"Hypsometric curve shape: {dem.hypsometric_curve.shape}")
+```
+
+**Common issues:**
+
+| Issue | Solution |
+|-------|----------|
+| "DEM file not found" | Check file path exists |
+| "All pixels are NoData" | DEM may not be clipped correctly, or NoData value is wrong |
+| "Invalid raster file" | File is not a valid raster format |
 
 ---
 
