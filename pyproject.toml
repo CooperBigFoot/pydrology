@@ -7,11 +7,14 @@ requires-python = ">=3.12"
 dependencies = [
     "ctrl-freak",
     "geopandas>=1.1.2",
+    "ipykernel>=7.1.0",
     "numpy>=2.4.1",
     "pandas>=3.0.0",
     "polars>=1.37.1",
     "pyarrow>=23.0.0",
     "pydantic>=2.0",
+    "seaborn>=0.13.2",
+    "tqdm>=4.66",
 ]
 
 
@@ -35,7 +38,7 @@ dev = [
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-extend-exclude = ["notebooks/", "experiments/"]
+extend-exclude = ["experiments/"]
 
 [tool.ruff.lint]
 # Errors, warnings, naming, imports, modern py, bugbear, comprehensions, simplify

@@ -856,6 +856,15 @@ print(f"Best NSE: {result.score['nse']:.3f}")
 print(f"X1: {result.parameters.x1:.1f}")
 ```
 
+By default, calibration displays a progress bar showing the current generation and best metric value. To disable the progress bar (e.g., for batch processing or logging):
+
+```python
+result = calibrate(
+    ...,
+    progress=False,  # Disable progress bar
+)
+```
+
 ### Multi-Objective Calibration
 
 Optimize for multiple metrics simultaneously to obtain a Pareto front:
@@ -898,6 +907,8 @@ print(f"Found {len(solutions)} Pareto-optimal solutions")
 for i, sol in enumerate(solutions[:3]):
     print(f"  {i+1}: NSE={sol.score['nse']:.3f}, log-NSE={sol.score['log_nse']:.3f}")
 ```
+
+For multi-objective optimization, the progress bar shows the current Pareto front size instead of a single best value.
 
 ### ObservedData
 
@@ -979,9 +990,25 @@ result = calibrate(
 
 Passing observed data that includes the warmup period will raise a `ValueError`.
 
+### Progress Monitoring
+
+By default, `calibrate()` displays a tqdm progress bar that shows:
+- **Single-objective (GA)**: Current generation and best metric value
+- **Multi-objective (NSGA-II)**: Current generation and Pareto front size
+
+Example output:
+```
+Calibrating: 45%|████████████              | 45/100 [00:30<00:37, 1.50gen/s, best=0.8523]
+```
+
+To disable the progress bar for batch processing or when using custom logging:
+```python
+result = calibrate(..., progress=False)
+```
+
 ### Early Stopping via Callback
 
-Monitor optimization progress and stop early if needed:
+Custom callbacks for monitoring or early stopping are only available when `progress=False`:
 
 ```python
 def my_callback(result, generation):
@@ -993,6 +1020,7 @@ def my_callback(result, generation):
 
 result = calibrate(
     ...,
+    progress=False,  # Required to use custom callback
     callback=my_callback,
 )
 ```

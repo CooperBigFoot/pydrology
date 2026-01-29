@@ -139,6 +139,7 @@ def calibrate(
     population_size: int = 50,
     generations: int = 100,
     seed: int | None = None,
+    progress: bool = True,
     callback: Callable | None = None,
 ) -> Solution | list[Solution]:
     """Calibrate GR6J parameters using evolutionary optimization.
@@ -162,8 +163,10 @@ def calibrate(
         population_size: EA population size. Default 50.
         generations: Number of EA generations. Default 100.
         seed: Random seed for reproducibility.
-        callback: Optional callback for monitoring. For GA, receives (GAResult, gen);
-            for NSGA-II, receives (NSGA2Result, gen). Return True to stop early.
+        progress: Whether to display a progress bar. Default True.
+        callback: Optional callback for monitoring. Only used when progress=False.
+            For GA, receives (GAResult, gen); for NSGA-II, receives (NSGA2Result, gen).
+            Return True to stop early.
 
     Returns:
         Single-objective: Solution with best parameters and score.
@@ -186,6 +189,8 @@ def calibrate(
     """
     # Lazy import ctrl-freak to keep it optional at import time
     from ctrl_freak import ga, nsga2, polynomial_mutation, sbx_crossover
+
+    from .progress import progress_context
 
     # Validate and normalize inputs
     objectives_dict = validate_objectives(objectives)
@@ -245,16 +250,30 @@ def calibrate(
     # Run optimization
     if len(objective_names) == 1:
         # Single-objective GA
-        result = ga(
-            init=init,
-            evaluate=evaluate_single,
-            crossover=crossover,
-            mutate=mutate,
-            pop_size=population_size,
-            n_generations=generations,
-            seed=seed,
-            callback=callback,
-        )
+        if progress:
+            with progress_context(generations, objective_names, negate_flags) as tracker:
+                result = ga(
+                    init=init,
+                    evaluate=evaluate_single,
+                    crossover=crossover,
+                    mutate=mutate,
+                    pop_size=population_size,
+                    n_generations=generations,
+                    seed=seed,
+                    callback=tracker.ga_callback,
+                )
+                tracker.finalize_ga(result)
+        else:
+            result = ga(
+                init=init,
+                evaluate=evaluate_single,
+                crossover=crossover,
+                mutate=mutate,
+                pop_size=population_size,
+                n_generations=generations,
+                seed=seed,
+                callback=callback,
+            )
         best_x, best_fitness = result.best
         best_params = _array_to_parameters(best_x, snow)
 
@@ -268,16 +287,30 @@ def calibrate(
 
     else:
         # Multi-objective NSGA-II
-        result = nsga2(
-            init=init,
-            evaluate=evaluate_multi,
-            crossover=crossover,
-            mutate=mutate,
-            pop_size=population_size,
-            n_generations=generations,
-            seed=seed,
-            callback=callback,
-        )
+        if progress:
+            with progress_context(generations, objective_names, negate_flags) as tracker:
+                result = nsga2(
+                    init=init,
+                    evaluate=evaluate_multi,
+                    crossover=crossover,
+                    mutate=mutate,
+                    pop_size=population_size,
+                    n_generations=generations,
+                    seed=seed,
+                    callback=tracker.nsga2_callback,
+                )
+                tracker.finalize_nsga2(result)
+        else:
+            result = nsga2(
+                init=init,
+                evaluate=evaluate_multi,
+                crossover=crossover,
+                mutate=mutate,
+                pop_size=population_size,
+                n_generations=generations,
+                seed=seed,
+                callback=callback,
+            )
 
         # Convert Pareto front to Solutions
         solutions = []

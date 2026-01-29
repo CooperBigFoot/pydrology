@@ -301,3 +301,89 @@ class TestCalibrate:
         assert result.parameters.snow is not None
         assert 0.5 <= result.parameters.snow.ctg <= 1.0
         assert 1.0 <= result.parameters.snow.kf <= 10.0
+
+    def test_progress_true_runs_without_error(
+        self,
+        simple_forcing: ForcingData,
+        simple_observed: ObservedData,
+        simple_bounds: dict[str, tuple[float, float]],
+    ) -> None:
+        """Calibration with progress=True should run without error."""
+        result = calibrate(
+            forcing=simple_forcing,
+            observed=simple_observed,
+            objectives=["nse"],
+            bounds=simple_bounds,
+            warmup=10,
+            population_size=10,
+            generations=3,
+            seed=42,
+            progress=True,
+        )
+        assert isinstance(result, Solution)
+
+    def test_progress_false_runs_without_error(
+        self,
+        simple_forcing: ForcingData,
+        simple_observed: ObservedData,
+        simple_bounds: dict[str, tuple[float, float]],
+    ) -> None:
+        """Calibration with progress=False should run without error."""
+        result = calibrate(
+            forcing=simple_forcing,
+            observed=simple_observed,
+            objectives=["nse"],
+            bounds=simple_bounds,
+            warmup=10,
+            population_size=10,
+            generations=3,
+            seed=42,
+            progress=False,
+        )
+        assert isinstance(result, Solution)
+
+    def test_progress_does_not_affect_results(
+        self,
+        simple_forcing: ForcingData,
+        simple_observed: ObservedData,
+        simple_bounds: dict[str, tuple[float, float]],
+    ) -> None:
+        """Results should be identical with progress=True vs progress=False."""
+        kwargs = {
+            "forcing": simple_forcing,
+            "observed": simple_observed,
+            "objectives": ["nse"],
+            "bounds": simple_bounds,
+            "warmup": 10,
+            "population_size": 10,
+            "generations": 3,
+            "seed": 42,
+        }
+        result_with_progress = calibrate(**kwargs, progress=True)
+        result_without_progress = calibrate(**kwargs, progress=False)
+
+        # Results should be deterministic with same seed
+        assert result_with_progress.parameters.x1 == result_without_progress.parameters.x1
+        assert result_with_progress.score["nse"] == result_without_progress.score["nse"]
+
+    def test_multi_objective_progress_works(
+        self,
+        simple_forcing: ForcingData,
+        simple_observed: ObservedData,
+        simple_bounds: dict[str, tuple[float, float]],
+    ) -> None:
+        """Multi-objective calibration should work with progress bar."""
+        result = calibrate(
+            forcing=simple_forcing,
+            observed=simple_observed,
+            objectives=["nse", "log_nse"],
+            bounds=simple_bounds,
+            warmup=10,
+            population_size=10,
+            generations=3,
+            seed=42,
+            progress=True,
+        )
+        assert isinstance(result, list)
+        assert len(result) > 0
+        assert all(isinstance(s, Solution) for s in result)
