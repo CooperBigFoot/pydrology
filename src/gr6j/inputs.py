@@ -7,14 +7,10 @@ This module defines validated input containers:
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
-from typing import ClassVar
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
-
-logger = logging.getLogger(__name__)
 
 
 class ForcingData(BaseModel):
@@ -108,30 +104,6 @@ class ForcingData(BaseModel):
         return len(self.time)
 
 
-# Catchment property bounds for validation warnings
-_CATCHMENT_BOUNDS: dict[str, tuple[float, float]] = {
-    "mean_annual_solid_precip": (0.0, 10000.0),
-}
-
-
-def _warn_if_outside_bounds(catchment: Catchment) -> None:
-    """Log warnings for catchment properties outside typical ranges.
-
-    This does not raise errors - properties outside bounds may still be valid
-    for specific catchments or research purposes.
-    """
-    for name, (lower, upper) in _CATCHMENT_BOUNDS.items():
-        value = getattr(catchment, name)
-        if value < lower or value > upper:
-            logger.warning(
-                "Catchment property %s=%.4f is outside typical range [%.2f, %.2f]",
-                name,
-                value,
-                lower,
-                upper,
-            )
-
-
 def _validate_multi_layer_config(catchment: Catchment) -> None:
     """Validate that multi-layer configuration is complete.
 
@@ -173,10 +145,6 @@ class Catchment:
     temp_gradient: float | None = None  # Temperature lapse rate [°C/100m]
     precip_gradient: float | None = None  # Precipitation gradient [m⁻¹]
 
-    # Class-level reference to bounds for external access
-    BOUNDS: ClassVar[dict[str, tuple[float, float]]] = _CATCHMENT_BOUNDS
-
     def __post_init__(self) -> None:
-        """Validate catchment properties and warn if outside typical ranges."""
-        _warn_if_outside_bounds(self)
+        """Validate multi-layer configuration."""
         _validate_multi_layer_config(self)

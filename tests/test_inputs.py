@@ -1,10 +1,8 @@
 """Tests for input data structures: ForcingData and Catchment.
 
-Tests cover validation, immutability, type coercion, and boundary warnings
+Tests cover validation, immutability, and type coercion
 for the input containers used by the GR6J model.
 """
-
-import logging
 
 import numpy as np
 import pytest
@@ -230,31 +228,6 @@ class TestCatchment:
         assert catchment.hypsometric_curve is None
         assert catchment.input_elevation is None
         assert catchment.n_layers == 1
-
-    # Bounds warnings
-
-    def test_warns_when_below_bounds(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Warning logged when mean_annual_solid_precip is below typical range."""
-        with caplog.at_level(logging.WARNING):
-            Catchment(mean_annual_solid_precip=-100.0)
-
-        assert len(caplog.records) == 1
-        assert "outside typical range" in caplog.text
-
-    def test_warns_when_above_bounds(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Warning logged when mean_annual_solid_precip exceeds typical range."""
-        with caplog.at_level(logging.WARNING):
-            Catchment(mean_annual_solid_precip=15000.0)
-
-        assert len(caplog.records) == 1
-        assert "outside typical range" in caplog.text
-
-    def test_no_warning_within_bounds(self, caplog: pytest.LogCaptureFixture) -> None:
-        """No warning logged when mean_annual_solid_precip is within typical range."""
-        with caplog.at_level(logging.WARNING):
-            Catchment(mean_annual_solid_precip=150.0)
-
-        assert len(caplog.records) == 0
 
     # Immutability
 

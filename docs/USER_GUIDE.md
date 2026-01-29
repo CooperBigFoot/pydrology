@@ -184,10 +184,6 @@ catchment_ml = Catchment(
 )
 ```
 
-**Typical Bounds:**
-
-The `mean_annual_solid_precip` value should typically be in the range [0, 10000] mm/year. Values outside this range trigger a warning but are not rejected.
-
 ---
 
 ## Model Parameters
@@ -196,14 +192,14 @@ The `mean_annual_solid_precip` value should typically be in the range [0, 10000]
 
 The GR6J model has 6 calibrated parameters:
 
-| Parameter | Description | Unit | Typical Range |
-|-----------|-------------|------|---------------|
-| **x1** | Production store capacity | mm | [1, 2500] |
-| **x2** | Intercatchment exchange coefficient | mm/day | [-5, 5] |
-| **x3** | Routing store capacity | mm | [1, 1000] |
-| **x4** | Unit hydrograph time constant | days | [0.5, 10] |
-| **x5** | Intercatchment exchange threshold | - | [-4, 4] |
-| **x6** | Exponential store scale parameter | mm | [0.01, 20] |
+| Parameter | Description | Unit |
+|-----------|-------------|------|
+| **x1** | Production store capacity | mm |
+| **x2** | Intercatchment exchange coefficient | mm/day |
+| **x3** | Routing store capacity | mm |
+| **x4** | Unit hydrograph time constant | days |
+| **x5** | Intercatchment exchange threshold | - |
+| **x6** | Exponential store scale parameter | mm |
 
 **Physical Interpretation:**
 
@@ -227,20 +223,16 @@ params = Parameters(
     x5=0.0,
     x6=5.0,
 )
-
-# Access bounds for calibration
-print(Parameters.BOUNDS)
-# {'x1': (1.0, 2500.0), 'x2': (-5.0, 5.0), 'x3': (1.0, 1000.0), ...}
 ```
 
 ### CemaNeige (Snow Module)
 
 The CemaNeige snow module has 2 calibrated parameters:
 
-| Parameter | Description | Unit | Typical Range |
-|-----------|-------------|------|---------------|
-| **ctg** | Thermal state weighting coefficient | - | [0, 1] |
-| **kf** | Degree-day melt factor | mm/deg C/day | [1, 10] |
+| Parameter | Description | Unit |
+|-----------|-------------|------|
+| **ctg** | Thermal state weighting coefficient | - |
+| **kf** | Degree-day melt factor | mm/deg C/day |
 
 **Typical Calibrated Values:**
 
@@ -265,10 +257,6 @@ snow = CemaNeige(
     ctg=0.97,
     kf=2.5,
 )
-
-# Access bounds
-print(CemaNeige.BOUNDS)
-# {'ctg': (0.0, 1.0), 'kf': (0.0, 200.0)}
 ```
 
 ### has_snow Property
@@ -1358,24 +1346,6 @@ precip = np.squeeze(precip_arr)
 ### "pet array must be 1D, got 2D"
 
 Same solution as above, applies to all input arrays.
-
-### Parameter out of range warnings
-
-**Cause:** A parameter value is outside its typical calibration range.
-
-**Note:** These are warnings, not errors. The model will still run. Out-of-range values may be valid for specific catchments or research purposes.
-
-```python
-import logging
-
-# Suppress warnings if intentional
-logging.getLogger("gr6j").setLevel(logging.ERROR)
-
-# Or check bounds before creating Parameters
-x1_value = 3000.0
-if x1_value < 1.0 or x1_value > 2500.0:
-    print(f"Warning: x1={x1_value} is outside typical range [1, 2500]")
-```
 
 ### "DEM file not found: ..."
 

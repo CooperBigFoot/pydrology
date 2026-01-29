@@ -8,36 +8,7 @@ This module defines the core data types used by the CemaNeige snow model:
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
-from typing import ClassVar
-
-logger = logging.getLogger(__name__)
-
-
-# Parameter bounds for validation warnings
-_PARAMETER_BOUNDS: dict[str, tuple[float, float]] = {
-    "ctg": (0.0, 1.0),
-    "kf": (0.0, 200.0),
-}
-
-
-def _warn_if_outside_bounds(params: CemaNeige) -> None:
-    """Log warnings for parameters outside typical calibration ranges.
-
-    This does not raise errors - parameters outside bounds may still be valid
-    for specific catchments or research purposes.
-    """
-    for name, (lower, upper) in _PARAMETER_BOUNDS.items():
-        value = getattr(params, name)
-        if value < lower or value > upper:
-            logger.warning(
-                "Parameter %s=%.4f is outside typical range [%.2f, %.2f]",
-                name,
-                value,
-                lower,
-                upper,
-            )
 
 
 @dataclass(frozen=True)
@@ -52,21 +23,13 @@ class CemaNeige:
 
     Attributes:
         ctg: Thermal state weighting coefficient [-]. Controls the inertia of
-            the snow pack thermal state. Typical range [0, 1].
+            the snow pack thermal state.
         kf: Degree-day melt factor [mm/°C/day]. Controls the rate of snowmelt
-            per degree above the melt threshold. Typical range [1, 10], but
-            can extend to [0, 200] for extreme cases.
+            per degree above the melt threshold.
     """
 
     ctg: float  # Thermal state weighting coefficient [-]
     kf: float  # Degree-day melt factor [mm/°C/day]
-
-    # Class-level reference to bounds for external access
-    BOUNDS: ClassVar[dict[str, tuple[float, float]]] = _PARAMETER_BOUNDS
-
-    def __post_init__(self) -> None:
-        """Validate parameters and warn if outside typical ranges."""
-        _warn_if_outside_bounds(self)
 
 
 @dataclass

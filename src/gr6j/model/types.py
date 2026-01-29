@@ -7,9 +7,8 @@ This module defines the core data types used by the GR6J hydrological model:
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -17,37 +16,6 @@ from .constants import NH
 
 if TYPE_CHECKING:
     from ..cemaneige import CemaNeige
-
-logger = logging.getLogger(__name__)
-
-
-# Parameter bounds for validation warnings
-_PARAMETER_BOUNDS: dict[str, tuple[float, float]] = {
-    "x1": (1.0, 2500.0),
-    "x2": (-5.0, 5.0),
-    "x3": (1.0, 1000.0),
-    "x4": (0.5, 10.0),
-    "x5": (-4.0, 4.0),
-    "x6": (0.01, 20.0),
-}
-
-
-def _warn_if_outside_bounds(params: Parameters) -> None:
-    """Log warnings for parameters outside typical calibration ranges.
-
-    This does not raise errors - parameters outside bounds may still be valid
-    for specific catchments or research purposes.
-    """
-    for name, (lower, upper) in _PARAMETER_BOUNDS.items():
-        value = getattr(params, name)
-        if value < lower or value > upper:
-            logger.warning(
-                "Parameter %s=%.4f is outside typical range [%.2f, %.2f]",
-                name,
-                value,
-                lower,
-                upper,
-            )
 
 
 @dataclass(frozen=True)
@@ -59,12 +27,12 @@ class Parameters:
     during simulation.
 
     Attributes:
-        x1: Production store capacity [mm]. Typical range [1, 2500].
-        x2: Intercatchment exchange coefficient [mm/day]. Typical range [-5, 5].
-        x3: Routing store capacity [mm]. Typical range [1, 1000].
-        x4: Unit hydrograph time constant [days]. Typical range [0.5, 10].
-        x5: Intercatchment exchange threshold [-]. Typical range [-4, 4].
-        x6: Exponential store scale parameter [mm]. Typical range [0.01, 20].
+        x1: Production store capacity [mm].
+        x2: Intercatchment exchange coefficient [mm/day].
+        x3: Routing store capacity [mm].
+        x4: Unit hydrograph time constant [days].
+        x5: Intercatchment exchange threshold [-].
+        x6: Exponential store scale parameter [mm].
         snow: Optional CemaNeige parameters for snow module. When provided,
             the model will preprocess precipitation through the snow module.
     """
@@ -77,13 +45,6 @@ class Parameters:
     x6: float  # Exponential store scale parameter [mm]
 
     snow: CemaNeige | None = None  # Optional snow module parameters
-
-    # Class-level reference to bounds for external access
-    BOUNDS: ClassVar[dict[str, tuple[float, float]]] = _PARAMETER_BOUNDS
-
-    def __post_init__(self) -> None:
-        """Validate parameters and warn if outside typical ranges."""
-        _warn_if_outside_bounds(self)
 
     @property
     def has_snow(self) -> bool:

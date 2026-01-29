@@ -1,11 +1,10 @@
 """Tests for GR6J data types: Parameters and State.
 
-Tests cover validation, immutability, initialization, and boundary warnings
+Tests cover validation, immutability, and initialization
 for the core data structures used throughout the model.
 """
 
 import dataclasses
-import logging
 
 import numpy as np
 import pytest
@@ -47,70 +46,6 @@ class TestParameters:
 
         with pytest.raises(AttributeError):
             params.x1 = 500.0  # type: ignore[misc]
-
-    def test_warns_when_x1_below_range(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Warning logged when x1 is below typical range (< 1.0)."""
-        with caplog.at_level(logging.WARNING):
-            Parameters(
-                x1=0.5,  # Below minimum of 1.0
-                x2=0.5,
-                x3=90.0,
-                x4=1.7,
-                x5=0.1,
-                x6=5.0,
-            )
-
-        assert len(caplog.records) == 1
-        assert "x1=0.5000" in caplog.text
-        assert "outside typical range" in caplog.text
-        assert "[1.00, 2500.00]" in caplog.text
-
-    def test_warns_when_x1_above_range(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Warning logged when x1 exceeds typical range (> 2500)."""
-        with caplog.at_level(logging.WARNING):
-            Parameters(
-                x1=3000.0,  # Above maximum of 2500
-                x2=0.5,
-                x3=90.0,
-                x4=1.7,
-                x5=0.1,
-                x6=5.0,
-            )
-
-        assert len(caplog.records) == 1
-        assert "x1=3000.0000" in caplog.text
-        assert "outside typical range" in caplog.text
-
-    def test_warns_when_x4_below_range(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Warning logged when x4 is below typical range (< 0.5)."""
-        with caplog.at_level(logging.WARNING):
-            Parameters(
-                x1=350.0,
-                x2=0.5,
-                x3=90.0,
-                x4=0.2,  # Below minimum of 0.5
-                x5=0.1,
-                x6=5.0,
-            )
-
-        assert len(caplog.records) == 1
-        assert "x4=0.2000" in caplog.text
-        assert "outside typical range" in caplog.text
-        assert "[0.50, 10.00]" in caplog.text
-
-    def test_no_warning_within_typical_ranges(self, caplog: pytest.LogCaptureFixture) -> None:
-        """No warnings logged when all parameters are within typical ranges."""
-        with caplog.at_level(logging.WARNING):
-            Parameters(
-                x1=350.0,
-                x2=0.5,
-                x3=90.0,
-                x4=1.7,
-                x5=0.1,
-                x6=5.0,
-            )
-
-        assert len(caplog.records) == 0
 
 
 class TestState:

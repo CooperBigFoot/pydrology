@@ -1,10 +1,8 @@
 """Tests for CemaNeige data types: CemaNeige parameters and CemaNeigeSingleLayerState.
 
-Tests cover validation, immutability, initialization, and boundary warnings
+Tests cover validation, immutability, and initialization
 for the core data structures used by the CemaNeige snow model.
 """
-
-import logging
 
 import pytest
 
@@ -27,83 +25,6 @@ class TestCemaNeige:
 
         with pytest.raises(AttributeError):
             params.ctg = 0.5  # type: ignore[misc]
-
-    def test_warns_when_ctg_below_range(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Warning logged when ctg is below 0."""
-        with caplog.at_level(logging.WARNING):
-            CemaNeige(ctg=-0.1, kf=2.5)
-
-        assert len(caplog.records) == 1
-        assert "ctg" in caplog.text
-        assert "outside typical range" in caplog.text
-
-    def test_warns_when_ctg_above_range(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Warning logged when ctg exceeds 1."""
-        with caplog.at_level(logging.WARNING):
-            CemaNeige(ctg=1.5, kf=2.5)
-
-        assert len(caplog.records) == 1
-        assert "ctg" in caplog.text
-        assert "outside typical range" in caplog.text
-
-    def test_warns_when_kf_below_range(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Warning logged when kf is below 0."""
-        with caplog.at_level(logging.WARNING):
-            CemaNeige(ctg=0.97, kf=-1.0)
-
-        assert len(caplog.records) == 1
-        assert "kf" in caplog.text
-        assert "outside typical range" in caplog.text
-
-    def test_warns_when_kf_above_range(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Warning logged when kf exceeds 200."""
-        with caplog.at_level(logging.WARNING):
-            CemaNeige(ctg=0.97, kf=250.0)
-
-        assert len(caplog.records) == 1
-        assert "kf" in caplog.text
-        assert "outside typical range" in caplog.text
-
-    def test_no_warning_within_typical_ranges(self, caplog: pytest.LogCaptureFixture) -> None:
-        """No warnings logged when all parameters are within typical ranges."""
-        with caplog.at_level(logging.WARNING):
-            CemaNeige(ctg=0.97, kf=2.5)
-
-        assert len(caplog.records) == 0
-
-    def test_bounds_class_variable_exists(self) -> None:
-        """CemaNeige has BOUNDS class variable for parameter bounds."""
-        assert hasattr(CemaNeige, "BOUNDS")
-        assert "ctg" in CemaNeige.BOUNDS
-        assert "kf" in CemaNeige.BOUNDS
-
-    def test_bounds_contains_correct_ranges(self) -> None:
-        """BOUNDS contains expected ranges for each parameter."""
-        assert CemaNeige.BOUNDS["ctg"] == (0.0, 1.0)
-        assert CemaNeige.BOUNDS["kf"] == (0.0, 200.0)
-
-    def test_warns_multiple_parameters_out_of_range(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Multiple warnings logged when multiple parameters are out of range."""
-        with caplog.at_level(logging.WARNING):
-            CemaNeige(ctg=-0.5, kf=300.0)
-
-        assert len(caplog.records) == 2
-        assert "ctg" in caplog.text
-        assert "kf" in caplog.text
-
-    def test_at_lower_boundary_no_warning(self, caplog: pytest.LogCaptureFixture) -> None:
-        """No warning when parameter is exactly at lower boundary."""
-        with caplog.at_level(logging.WARNING):
-            CemaNeige(ctg=0.0, kf=0.0)
-
-        assert len(caplog.records) == 0
-
-    def test_at_upper_boundary_no_warning(self, caplog: pytest.LogCaptureFixture) -> None:
-        """No warning when parameter is exactly at upper boundary."""
-        with caplog.at_level(logging.WARNING):
-            CemaNeige(ctg=1.0, kf=200.0)
-
-        assert len(caplog.records) == 0
 
 
 class TestCemaNeigeSingleLayerState:
