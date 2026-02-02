@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Python implementation of the GR6J lumped conceptual rainfall-runoff model for daily streamflow simulation. Extends GR4J with an exponential store for improved low-flow modeling, and includes the optional CemaNeige snow module for cold-climate catchments. Supports both simulation and automatic calibration via evolutionary algorithms.
+PyDrology is a Python library for lumped conceptual rainfall-runoff modeling at daily timesteps. Includes GR6J (an extension of GR4J with an exponential store for low-flow simulation) and the coupled GR6J-CemaNeige model for cold-climate catchments with snow. Supports simulation, single-timestep execution, and automatic calibration via evolutionary algorithms.
 
 ## Quick Reference
 
