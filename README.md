@@ -16,10 +16,10 @@ GR6J is an extension of the widely-used GR4J model, developed by INRAE (France),
 |----------|-------|
 | Time step | Daily |
 | Spatial resolution | Lumped (catchment-scale) |
-| Models | GR6J (6 params), GR6J-CemaNeige (8 params) |
-| Stores | 3 (Production, Routing, Exponential) |
-| Unit hydrographs | 2 (UH1 and UH2) |
-| Inputs | Precipitation (P), PET (E), Temperature (T, optional) |
+| Models | GR6J (6 params), GR6J-CemaNeige (8 params), HBV-light (14 params) |
+| Stores | 3 for GR6J (Production, Routing, Exponential), 4 for HBV-light (Snow, Soil, Upper Zone, Lower Zone) |
+| Unit hydrographs | S-curve (GR6J), Triangular (HBV-light) |
+| Inputs | Precipitation (P), PET (E), Temperature (T, required for snow models) |
 | Output | Streamflow at catchment outlet (Q) |
 
 ## Installation
@@ -153,6 +153,38 @@ output = run(params, forcing, catchment=catchment)
 print(output.snow_layers.snow_pack.shape)  # (n_timesteps, 5)
 ```
 
+### HBV-light Model
+
+HBV-light is a widely-used conceptual model with built-in snow routine. It requires temperature data:
+
+```python
+import numpy as np
+from pydrology import ForcingData, get_model
+
+# Get the HBV-light model
+model = get_model("hbv_light")
+
+# Create forcing data (temperature required for HBV-light)
+forcing = ForcingData(
+    time=np.arange(5, dtype='datetime64[D]') + np.datetime64('2020-01-01'),
+    precip=np.array([10.0, 5.0, 0.0, 15.0, 8.0]),
+    pet=np.array([3.0, 4.0, 5.0, 3.5, 4.0]),
+    temp=np.array([-5.0, 0.0, 5.0, -2.0, 8.0]),  # Required!
+)
+
+# Define HBV-light parameters (14 total)
+params = model.Parameters(
+    tt=0.0, cfmax=3.0, sfcf=1.0, cwh=0.1, cfr=0.05,  # Snow
+    fc=250.0, lp=0.9, beta=2.0,                       # Soil
+    k0=0.4, k1=0.1, k2=0.01, perc=1.0, uzl=20.0,     # Response
+    maxbas=2.5,                                       # Routing
+)
+
+# Run the model
+output = model.run(params, forcing)
+print(output.streamflow)
+```
+
 ### Single Timestep Execution
 
 ```python
@@ -243,8 +275,9 @@ For detailed CemaNeige equations and algorithm, see [`docs/CEMANEIGE.md`](docs/C
 
 ## Documentation
 
-- Model equations: [`docs/MODEL_DEFINITION.md`](docs/MODEL_DEFINITION.md)
-- Snow module: [`docs/CEMANEIGE.md`](docs/CEMANEIGE.md)
+- GR6J model equations: [`docs/MODEL_DEFINITION.md`](docs/MODEL_DEFINITION.md)
+- HBV-light model: [`docs/HBV_LIGHT.md`](docs/HBV_LIGHT.md)
+- CemaNeige snow module: [`docs/CEMANEIGE.md`](docs/CEMANEIGE.md)
 - User guide: [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md)
 - Input validation: [`docs/FORCING_DATA_CONTRACT.md`](docs/FORCING_DATA_CONTRACT.md)
 - Model interface: [`docs/MODEL_CONTRACT.md`](docs/MODEL_CONTRACT.md)

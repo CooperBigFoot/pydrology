@@ -4,6 +4,8 @@ A collection of lumped conceptual rainfall-runoff models for daily streamflow si
 Includes GR6J (Génie Rural à 6 paramètres Journalier) and optional CemaNeige snow module.
 """
 
+import pydrology.models.gr6j_cemaneige  # noqa: F401 - triggers auto-registration
+import pydrology.models.hbv_light  # noqa: F401 - triggers auto-registration
 from pydrology.calibration import ObservedData, Solution, calibrate, list_metrics
 from pydrology.cemaneige import (
     CemaNeige,
@@ -13,7 +15,6 @@ from pydrology.cemaneige import (
     cemaneige_step,
 )
 from pydrology.models.gr6j import Parameters, State, run, step
-import pydrology.models.gr6j_cemaneige  # noqa: F401 - triggers auto-registration
 from pydrology.outputs import GR6JFluxes, GR6JOutput, ModelOutput, SnowLayerOutputs, SnowOutput
 from pydrology.registry import get_model, get_model_info, list_models
 from pydrology.types import Catchment, ForcingData

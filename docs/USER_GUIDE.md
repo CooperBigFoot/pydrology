@@ -362,6 +362,7 @@ PyDrology provides a model registry for dynamic model discovery and selection. T
 |-------|------------|-------------|
 | `gr6j` | 6 | GR6J rainfall-runoff model |
 | `gr6j_cemaneige` | 8 | GR6J coupled with CemaNeige snow module |
+| `hbv_light` | 14 | HBV-light model with built-in snow routine |
 
 ### Using the Registry
 
@@ -676,6 +677,103 @@ The CemaNeige module processes precipitation before it enters GR6J:
 5. **Output**: Liquid precipitation + melt becomes the precipitation input to GR6J
 
 When snow is enabled, the model outputs 32 columns (20 GR6J + 12 CemaNeige).
+
+---
+
+## HBV-light Model
+
+PyDrology also includes the HBV-light model, a widely-used conceptual rainfall-runoff model originally developed in Sweden. Unlike GR6J which requires an external snow module (CemaNeige), HBV-light has a built-in degree-day snow routine.
+
+### Quick Start
+
+```python
+import numpy as np
+from pydrology import ForcingData, get_model
+
+# Get the HBV-light model
+model = get_model("hbv_light")
+
+# Create forcing data (temperature is required for HBV-light)
+n_days = 365
+forcing = ForcingData(
+    time=np.arange(n_days, dtype='datetime64[D]') + np.datetime64('2020-01-01'),
+    precip=np.random.exponential(5.0, n_days),
+    pet=np.full(n_days, 3.5),
+    temp=np.sin(np.linspace(0, 2*np.pi, n_days)) * 15,  # Required!
+)
+
+# Define HBV-light parameters (14 total)
+params = model.Parameters(
+    tt=0.0,       # Threshold temperature [°C]
+    cfmax=3.0,    # Degree-day factor [mm/°C/d]
+    sfcf=1.0,     # Snowfall correction factor [-]
+    cwh=0.1,      # Water holding capacity of snow [-]
+    cfr=0.05,     # Refreezing coefficient [-]
+    fc=250.0,     # Field capacity [mm]
+    lp=0.9,       # Limit for potential ET [-]
+    beta=2.0,     # Shape coefficient [-]
+    k0=0.4,       # Surface flow recession [1/d]
+    k1=0.1,       # Interflow recession [1/d]
+    k2=0.01,      # Baseflow recession [1/d]
+    perc=1.0,     # Maximum percolation [mm/d]
+    uzl=20.0,     # Upper zone threshold [mm]
+    maxbas=2.5,   # Routing time [d]
+)
+
+# Run the model
+output = model.run(params, forcing)
+print(output.streamflow)  # Daily streamflow [mm/day]
+```
+
+### HBV-light Parameters
+
+| Parameter | Description | Unit | Typical Range |
+|-----------|-------------|------|---------------|
+| **tt** | Threshold temperature for rain/snow | °C | [-2.5, 2.5] |
+| **cfmax** | Degree-day factor for snowmelt | mm/°C/d | [0.5, 10.0] |
+| **sfcf** | Snowfall correction factor | - | [0.4, 1.4] |
+| **cwh** | Water holding capacity of snow | - | [0.0, 0.2] |
+| **cfr** | Refreezing coefficient | - | [0.0, 0.2] |
+| **fc** | Field capacity (max soil moisture) | mm | [50, 700] |
+| **lp** | Limit for potential ET (fraction of FC) | - | [0.3, 1.0] |
+| **beta** | Shape coefficient for runoff | - | [1.0, 6.0] |
+| **k0** | Surface/quick flow recession | 1/d | [0.05, 0.99] |
+| **k1** | Interflow recession | 1/d | [0.01, 0.5] |
+| **k2** | Baseflow recession | 1/d | [0.001, 0.2] |
+| **perc** | Maximum percolation rate | mm/d | [0.0, 6.0] |
+| **uzl** | Upper zone threshold for K0 flow | mm | [0.0, 100.0] |
+| **maxbas** | Length of triangular unit hydrograph | d | [1.0, 7.0] |
+
+### When to Use HBV-light vs GR6J
+
+| Use HBV-light when... | Use GR6J when... |
+|-----------------------|------------------|
+| Snow is important (built-in snow routine) | Groundwater exchange matters (X2/X5 parameters) |
+| You need more process detail (4 stores) | You want fewer parameters (6 vs 14) |
+| You're familiar with HBV from other software | Slow baseflow is critical (exponential store) |
+| Calibrating for multiple response timescales | Non-snow-dominated catchments |
+
+### Calibration Example
+
+```python
+from pydrology import ForcingData, ObservedData, calibrate
+
+# Calibrate HBV-light with default bounds
+result = calibrate(
+    model="hbv_light",
+    forcing=forcing,
+    observed=observed,
+    objectives=["nse"],
+    use_default_bounds=True,
+    warmup=365,
+)
+
+print(f"Best NSE: {result.score['nse']:.3f}")
+print(f"FC: {result.parameters.fc:.1f} mm")
+print(f"CFMAX: {result.parameters.cfmax:.2f} mm/°C/d")
+```
+
+For detailed model equations and structure, see [HBV_LIGHT.md](HBV_LIGHT.md).
 
 ---
 
