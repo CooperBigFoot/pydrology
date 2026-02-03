@@ -12,7 +12,7 @@ This repository is part of an ongoing project and actively maintained.
 ## Installation
 
 ```bash
-git clone https://github.com/nicolaslazaro/pydrology.git
+git clone https://github.com/CooperBigFoot/pydrology.git
 cd pydrology
 uv sync
 ```
