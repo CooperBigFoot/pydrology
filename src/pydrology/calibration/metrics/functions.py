@@ -37,14 +37,12 @@ def log_nse(observed: ArrayLike, simulated: ArrayLike) -> float:
     """
     obs = np.asarray(observed)
     sim = np.asarray(simulated)
+
     # Add small constant to avoid log(0)
     log_obs = np.log(obs + 1e-6)
     log_sim = np.log(sim + 1e-6)
-    numerator = np.sum((log_obs - log_sim) ** 2)
-    denominator = np.sum((log_obs - np.mean(log_obs)) ** 2)
-    if denominator == 0:
-        return -np.inf
-    return float(1.0 - numerator / denominator)
+
+    return nse(log_obs, log_sim)
 
 
 @register("maximize")
