@@ -13,6 +13,7 @@ from .constants import (
     PARAM_NAMES,
     SNOW_LAYER_STATE_SIZE,
     STATE_SIZE_BASE,
+    SUPPORTED_RESOLUTIONS,
     compute_state_size,
 )
 from .outputs import GR6JCemaNeigeFluxes
@@ -30,6 +31,7 @@ __all__ = [
     "SNOW_LAYER_STATE_SIZE",
     "STATE_SIZE",
     "STATE_SIZE_BASE",
+    "SUPPORTED_RESOLUTIONS",
     "State",
     "_run_unified_numba",
     "compute_state_size",

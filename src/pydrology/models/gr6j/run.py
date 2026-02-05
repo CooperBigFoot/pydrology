@@ -14,7 +14,7 @@ from numba import njit
 
 from pydrology.types import ForcingData
 from pydrology.outputs import ModelOutput
-from .constants import B, C
+from .constants import B, C, SUPPORTED_RESOLUTIONS
 from .outputs import GR6JFluxes
 from .processes import (
     direct_branch,
@@ -335,6 +335,11 @@ def run(
         >>> result.streamflow
         array([...])
     """
+    if forcing.resolution not in SUPPORTED_RESOLUTIONS:
+        supported = [r.value for r in SUPPORTED_RESOLUTIONS]
+        msg = f"GR6J supports resolutions {supported}, got '{forcing.resolution.value}'"
+        raise ValueError(msg)
+
     # Initialize state if not provided
     state = State.initialize(params) if initial_state is None else initial_state
 

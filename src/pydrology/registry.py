@@ -20,6 +20,8 @@ Optional model exports:
 import logging
 from types import ModuleType
 
+from pydrology.types import Resolution
+
 logger = logging.getLogger(__name__)
 
 # Required module-level exports
@@ -31,6 +33,7 @@ _REQUIRED_EXPORTS: tuple[str, ...] = (
     "State",
     "run",
     "step",
+    "SUPPORTED_RESOLUTIONS",
 )
 
 # Required methods for Parameters class
@@ -86,6 +89,15 @@ def _validate_module(name: str, module: ModuleType) -> None:
     if missing_state_methods:
         missing_str = ", ".join(missing_state_methods)
         msg = f"Model '{name}' State class is missing required methods: {missing_str}"
+        raise ValueError(msg)
+
+    # Check SUPPORTED_RESOLUTIONS is valid
+    resolutions = module.SUPPORTED_RESOLUTIONS
+    if not isinstance(resolutions, tuple):
+        msg = f"Model '{name}' SUPPORTED_RESOLUTIONS must be a tuple"
+        raise ValueError(msg)
+    if not all(isinstance(r, Resolution) for r in resolutions):
+        msg = f"Model '{name}' SUPPORTED_RESOLUTIONS must contain only Resolution enum values"
         raise ValueError(msg)
 
 
@@ -185,4 +197,5 @@ def get_model_info(name: str) -> dict[str, object]:
         "default_bounds": module.DEFAULT_BOUNDS,
         "state_size": module.STATE_SIZE,
         "has_numba": has_numba,
+        "supported_resolutions": module.SUPPORTED_RESOLUTIONS,
     }

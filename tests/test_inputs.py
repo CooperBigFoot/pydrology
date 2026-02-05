@@ -306,3 +306,360 @@ class TestCatchmentMultiLayerValidation:
 
         assert catchment.temp_gradient == 0.8
         assert catchment.precip_gradient == 0.0005
+
+
+class TestResolution:
+    """Tests for the Resolution enum."""
+
+    def test_hourly_less_than_daily(self) -> None:
+        """hourly < daily comparison is True."""
+        from pydrology import Resolution
+
+        assert Resolution.hourly < Resolution.daily
+
+    def test_daily_less_than_monthly(self) -> None:
+        """daily < monthly comparison is True."""
+        from pydrology import Resolution
+
+        assert Resolution.daily < Resolution.monthly
+
+    def test_monthly_less_than_annual(self) -> None:
+        """monthly < annual comparison is True."""
+        from pydrology import Resolution
+
+        assert Resolution.monthly < Resolution.annual
+
+    def test_daily_not_less_than_hourly(self) -> None:
+        """daily < hourly comparison is False."""
+        from pydrology import Resolution
+
+        assert not Resolution.daily < Resolution.hourly
+
+    def test_equal_resolution_not_less_than(self) -> None:
+        """Resolution is not less than itself."""
+        from pydrology import Resolution
+
+        assert not Resolution.daily < Resolution.daily
+
+    def test_less_than_or_equal_same(self) -> None:
+        """Resolution is less than or equal to itself."""
+        from pydrology import Resolution
+
+        assert Resolution.daily <= Resolution.daily
+
+    def test_days_per_timestep_hourly(self) -> None:
+        """hourly has 1/24 days per timestep."""
+        from pydrology import Resolution
+
+        assert Resolution.hourly.days_per_timestep == pytest.approx(1 / 24)
+
+    def test_days_per_timestep_daily(self) -> None:
+        """daily has 1.0 days per timestep."""
+        from pydrology import Resolution
+
+        assert Resolution.daily.days_per_timestep == 1.0
+
+    def test_days_per_timestep_monthly(self) -> None:
+        """monthly has 30.4375 days per timestep."""
+        from pydrology import Resolution
+
+        assert Resolution.monthly.days_per_timestep == 30.4375
+
+    def test_days_per_timestep_annual(self) -> None:
+        """annual has 365.25 days per timestep."""
+        from pydrology import Resolution
+
+        assert Resolution.annual.days_per_timestep == 365.25
+
+    def test_string_equality(self) -> None:
+        """Resolution can be compared to string."""
+        from pydrology import Resolution
+
+        assert Resolution.daily == "daily"
+
+
+class TestForcingDataResolution:
+    """Tests for ForcingData resolution validation."""
+
+    def test_default_resolution_is_daily(self) -> None:
+        """ForcingData defaults to daily resolution."""
+        from pydrology import Resolution
+
+        forcing = ForcingData(
+            time=_make_dates(5),
+            precip=np.zeros(5),
+            pet=np.zeros(5),
+        )
+        assert forcing.resolution == Resolution.daily
+
+    def test_accepts_explicit_daily_resolution(self) -> None:
+        """ForcingData accepts explicit daily resolution."""
+        from pydrology import Resolution
+
+        forcing = ForcingData(
+            time=_make_dates(5),
+            precip=np.zeros(5),
+            pet=np.zeros(5),
+            resolution=Resolution.daily,
+        )
+        assert forcing.resolution == Resolution.daily
+
+    def test_accepts_monthly_resolution_with_monthly_data(self) -> None:
+        """ForcingData accepts monthly resolution with monthly time steps."""
+        from pydrology import Resolution
+
+        time = np.arange("2020-01", "2020-07", dtype="datetime64[M]")
+        forcing = ForcingData(
+            time=time,
+            precip=np.zeros(6),
+            pet=np.zeros(6),
+            resolution=Resolution.monthly,
+        )
+        assert forcing.resolution == Resolution.monthly
+
+    def test_accepts_annual_resolution_with_annual_data(self) -> None:
+        """ForcingData accepts annual resolution with annual time steps."""
+        from pydrology import Resolution
+
+        time = np.arange("2020", "2025", dtype="datetime64[Y]")
+        forcing = ForcingData(
+            time=time,
+            precip=np.zeros(5),
+            pet=np.zeros(5),
+            resolution=Resolution.annual,
+        )
+        assert forcing.resolution == Resolution.annual
+
+    def test_rejects_mismatched_resolution_daily_data_monthly_resolution(self) -> None:
+        """ValueError when daily data has monthly resolution."""
+        from pydrology import Resolution
+
+        with pytest.raises(ValidationError, match="Time spacing.*does not match"):
+            ForcingData(
+                time=_make_dates(30),  # Daily data
+                precip=np.zeros(30),
+                pet=np.zeros(30),
+                resolution=Resolution.monthly,  # But monthly resolution
+            )
+
+    def test_rejects_mismatched_resolution_monthly_data_daily_resolution(self) -> None:
+        """ValueError when monthly data has daily resolution."""
+        from pydrology import Resolution
+
+        time = np.arange("2020-01", "2020-07", dtype="datetime64[M]")
+        with pytest.raises(ValidationError, match="Time spacing.*does not match"):
+            ForcingData(
+                time=time,  # Monthly data
+                precip=np.zeros(6),
+                pet=np.zeros(6),
+                resolution=Resolution.daily,  # But daily resolution
+            )
+
+    def test_single_timestep_skips_validation(self) -> None:
+        """Single timestep skips resolution validation."""
+        from pydrology import Resolution
+
+        forcing = ForcingData(
+            time=np.array(["2020-01-01"], dtype="datetime64[D]"),
+            precip=np.array([10.0]),
+            pet=np.array([3.0]),
+            resolution=Resolution.monthly,  # Would fail with >1 timestep
+        )
+        assert len(forcing) == 1
+
+    def test_tolerates_variable_month_lengths(self) -> None:
+        """Monthly resolution tolerates 28-31 day months."""
+        from pydrology import Resolution
+
+        # Use actual month boundaries (28, 29, 30, 31 days)
+        time = np.array(
+            ["2020-02-01", "2020-03-01", "2020-04-01", "2020-05-01"],
+            dtype="datetime64[D]",
+        )
+        forcing = ForcingData(
+            time=time,
+            precip=np.zeros(4),
+            pet=np.zeros(4),
+            resolution=Resolution.monthly,
+        )
+        assert forcing.resolution == Resolution.monthly
+
+    def test_resolution_is_immutable(self) -> None:
+        """Resolution field is frozen."""
+        from pydrology import Resolution
+
+        forcing = ForcingData(
+            time=_make_dates(5),
+            precip=np.zeros(5),
+            pet=np.zeros(5),
+        )
+        with pytest.raises(ValidationError):
+            forcing.resolution = Resolution.monthly  # type: ignore[misc]
+
+
+class TestForcingDataAggregate:
+    """Tests for ForcingData aggregate method."""
+
+    def test_aggregate_daily_to_monthly(self) -> None:
+        """Aggregates daily data to monthly."""
+        from pydrology import Resolution
+
+        # Create 3 months of daily data (Jan, Feb, Mar 2020)
+        time = np.arange("2020-01-01", "2020-04-01", dtype="datetime64[D]")
+        n = len(time)
+        forcing = ForcingData(
+            time=time,
+            precip=np.ones(n) * 10.0,  # 10mm/day
+            pet=np.ones(n) * 3.0,  # 3mm/day
+            temp=np.ones(n) * 15.0,  # 15C
+        )
+        monthly = forcing.aggregate(Resolution.monthly)
+        assert monthly.resolution == Resolution.monthly
+        assert len(monthly) == 3  # 3 months
+
+    def test_aggregate_daily_to_annual(self) -> None:
+        """Aggregates daily data to annual."""
+        from pydrology import Resolution
+
+        time = np.arange("2020-01-01", "2022-01-01", dtype="datetime64[D]")
+        n = len(time)
+        forcing = ForcingData(
+            time=time,
+            precip=np.ones(n) * 2.0,
+            pet=np.ones(n) * 1.0,
+        )
+        annual = forcing.aggregate(Resolution.annual)
+        assert annual.resolution == Resolution.annual
+        assert len(annual) == 2  # 2 years
+
+    def test_aggregate_sums_precip(self) -> None:
+        """Aggregate sums precipitation."""
+        from pydrology import Resolution
+
+        time = np.arange("2020-01-01", "2020-02-01", dtype="datetime64[D]")
+        n = len(time)  # 31 days in January
+        forcing = ForcingData(
+            time=time,
+            precip=np.ones(n) * 10.0,  # 10mm/day
+            pet=np.ones(n) * 3.0,
+        )
+        monthly = forcing.aggregate(Resolution.monthly)
+        assert monthly.precip[0] == pytest.approx(310.0, rel=1e-3)  # 31 * 10
+
+    def test_aggregate_sums_pet(self) -> None:
+        """Aggregate sums PET."""
+        from pydrology import Resolution
+
+        time = np.arange("2020-01-01", "2020-02-01", dtype="datetime64[D]")
+        n = len(time)  # 31 days
+        forcing = ForcingData(
+            time=time,
+            precip=np.ones(n),
+            pet=np.ones(n) * 3.0,  # 3mm/day
+        )
+        monthly = forcing.aggregate(Resolution.monthly)
+        assert monthly.pet[0] == pytest.approx(93.0, rel=1e-3)  # 31 * 3
+
+    def test_aggregate_means_temp(self) -> None:
+        """Aggregate means temperature."""
+        from pydrology import Resolution
+
+        time = np.arange("2020-01-01", "2020-02-01", dtype="datetime64[D]")
+        n = len(time)
+        forcing = ForcingData(
+            time=time,
+            precip=np.ones(n),
+            pet=np.ones(n),
+            temp=np.ones(n) * 15.0,  # Constant 15C
+        )
+        monthly = forcing.aggregate(Resolution.monthly)
+        assert monthly.temp is not None
+        assert monthly.temp[0] == pytest.approx(15.0, rel=1e-3)
+
+    def test_aggregate_handles_no_temp(self) -> None:
+        """Aggregate works without temperature."""
+        from pydrology import Resolution
+
+        time = np.arange("2020-01-01", "2020-04-01", dtype="datetime64[D]")
+        n = len(time)
+        forcing = ForcingData(
+            time=time,
+            precip=np.ones(n),
+            pet=np.ones(n),
+            temp=None,
+        )
+        monthly = forcing.aggregate(Resolution.monthly)
+        assert monthly.temp is None
+
+    def test_aggregate_custom_method(self) -> None:
+        """Aggregate accepts custom aggregation methods."""
+        from pydrology import Resolution
+
+        time = np.arange("2020-01-01", "2020-02-01", dtype="datetime64[D]")
+        n = len(time)
+        forcing = ForcingData(
+            time=time,
+            precip=np.ones(n) * 10.0,
+            pet=np.ones(n) * 3.0,
+        )
+        monthly = forcing.aggregate(Resolution.monthly, methods={"precip": "mean"})
+        assert monthly.precip[0] == pytest.approx(10.0, rel=1e-3)  # mean, not sum
+
+    def test_aggregate_rejects_same_resolution(self) -> None:
+        """Cannot aggregate to same resolution."""
+        from pydrology import Resolution
+
+        forcing = ForcingData(
+            time=_make_dates(30),
+            precip=np.zeros(30),
+            pet=np.zeros(30),
+        )
+        with pytest.raises(ValueError, match="target must be coarser"):
+            forcing.aggregate(Resolution.daily)
+
+    def test_aggregate_rejects_finer_resolution(self) -> None:
+        """Cannot aggregate to finer resolution."""
+        from pydrology import Resolution
+
+        time = np.arange("2020-01", "2020-07", dtype="datetime64[M]")
+        forcing = ForcingData(
+            time=time,
+            precip=np.zeros(6),
+            pet=np.zeros(6),
+            resolution=Resolution.monthly,
+        )
+        with pytest.raises(ValueError, match="target must be coarser"):
+            forcing.aggregate(Resolution.daily)
+
+    def test_aggregate_returns_new_forcingdata(self) -> None:
+        """Aggregate returns a new ForcingData instance."""
+        from pydrology import Resolution
+
+        time = np.arange("2020-01-01", "2020-04-01", dtype="datetime64[D]")
+        n = len(time)
+        forcing = ForcingData(
+            time=time,
+            precip=np.ones(n),
+            pet=np.ones(n),
+        )
+        monthly = forcing.aggregate(Resolution.monthly)
+        assert monthly is not forcing
+        assert isinstance(monthly, ForcingData)
+
+    def test_aggregate_monthly_to_annual(self) -> None:
+        """Aggregates monthly data to annual."""
+        from pydrology import Resolution
+
+        time = np.arange("2020-01", "2022-01", dtype="datetime64[M]")
+        n = len(time)  # 24 months
+        forcing = ForcingData(
+            time=time,
+            precip=np.ones(n) * 50.0,  # 50mm/month
+            pet=np.ones(n) * 30.0,  # 30mm/month
+            resolution=Resolution.monthly,
+        )
+        annual = forcing.aggregate(Resolution.annual)
+        assert annual.resolution == Resolution.annual
+        assert len(annual) == 2
+        # 12 months * 50mm = 600mm per year
+        assert annual.precip[0] == pytest.approx(600.0, rel=1e-2)

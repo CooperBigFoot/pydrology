@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from pydrology import registry
+from pydrology.types import Resolution
 
 
 class TestModelRegistry:
@@ -191,6 +192,7 @@ class TestRegisterFunction:
             STATE_SIZE = 1
             Parameters = FakeParameters
             State = FakeState
+            SUPPORTED_RESOLUTIONS = (Resolution.daily,)
 
             @staticmethod
             def run() -> None:
@@ -223,6 +225,7 @@ class TestRegisterFunction:
             STATE_SIZE = 1
             Parameters = FakeParameters
             State = FakeState
+            SUPPORTED_RESOLUTIONS = (Resolution.daily,)
 
             @staticmethod
             def run() -> None:
@@ -234,3 +237,32 @@ class TestRegisterFunction:
 
         with pytest.raises(ValueError, match="State class is missing"):
             registry.register("fake_model", FakeModule())  # type: ignore[arg-type]
+
+
+class TestSupportedResolutionsContract:
+    """Tests for SUPPORTED_RESOLUTIONS model contract."""
+
+    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige", "hbv_light"])
+    def test_model_has_supported_resolutions(self, model_name: str) -> None:
+        """Registered model has SUPPORTED_RESOLUTIONS attribute."""
+        model = registry.get_model(model_name)
+        assert hasattr(model, "SUPPORTED_RESOLUTIONS")
+
+    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige", "hbv_light"])
+    def test_supported_resolutions_is_tuple(self, model_name: str) -> None:
+        """SUPPORTED_RESOLUTIONS is a tuple."""
+        model = registry.get_model(model_name)
+        assert isinstance(model.SUPPORTED_RESOLUTIONS, tuple)
+
+    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige", "hbv_light"])
+    def test_supported_resolutions_contains_resolution_enums(self, model_name: str) -> None:
+        """SUPPORTED_RESOLUTIONS contains Resolution enum values."""
+        model = registry.get_model(model_name)
+        for res in model.SUPPORTED_RESOLUTIONS:
+            assert isinstance(res, Resolution)
+
+    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige", "hbv_light"])
+    def test_get_model_info_includes_supported_resolutions(self, model_name: str) -> None:
+        """get_model_info returns supported_resolutions."""
+        info = registry.get_model_info(model_name)
+        assert "supported_resolutions" in info

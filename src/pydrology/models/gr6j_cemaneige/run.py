@@ -38,6 +38,7 @@ from pydrology.models.gr6j.unit_hydrographs import compute_uh_ordinates
 from pydrology.outputs import ModelOutput
 from pydrology.types import Catchment, ForcingData
 
+from .constants import SUPPORTED_RESOLUTIONS
 from .outputs import GR6JCemaNeigeFluxes
 from .types import Parameters, State
 
@@ -390,6 +391,11 @@ def run(
     # Validate temperature is provided
     if forcing.temp is None:
         msg = "Temperature data (forcing.temp) is required for the GR6J-CemaNeige model"
+        raise ValueError(msg)
+
+    if forcing.resolution not in SUPPORTED_RESOLUTIONS:
+        supported = [r.value for r in SUPPORTED_RESOLUTIONS]
+        msg = f"GR6J-CemaNeige supports resolutions {supported}, got '{forcing.resolution.value}'"
         raise ValueError(msg)
 
     n_timesteps = len(forcing)

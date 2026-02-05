@@ -4,6 +4,8 @@ Fixed values and model contract constants for the coupled GR6J-CemaNeige model.
 Combines GR6J routing parameters with CemaNeige snow module parameters.
 """
 
+from pydrology.types import Resolution
+
 # Model contract constants (8 parameters: 6 GR6J + 2 CemaNeige)
 PARAM_NAMES: tuple[str, ...] = ("x1", "x2", "x3", "x4", "x5", "x6", "ctg", "kf")
 
@@ -33,3 +35,6 @@ def compute_state_size(n_layers: int) -> int:
         Total state array size.
     """
     return STATE_SIZE_BASE + n_layers * SNOW_LAYER_STATE_SIZE
+
+
+SUPPORTED_RESOLUTIONS: tuple[Resolution, ...] = (Resolution.daily,)

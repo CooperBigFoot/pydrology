@@ -6,15 +6,16 @@ A complete guide to using the PyDrology hydrological modeling package, including
 
 1. [Quick Start](#quick-start)
 2. [Input Data](#input-data)
-3. [Model Parameters](#model-parameters)
-4. [Running the Model](#running-the-model)
-5. [Model Selection](#model-selection)
-6. [Model Outputs](#model-outputs)
-7. [Snow Module](#snow-module)
-8. [Advanced Usage](#advanced-usage)
-9. [Utilities](#utilities)
-10. [Calibration](#calibration)
-11. [Common Errors](#common-errors)
+3. [Temporal Resolution](#temporal-resolution)
+4. [Model Parameters](#model-parameters)
+5. [Running the Model](#running-the-model)
+6. [Model Selection](#model-selection)
+7. [Model Outputs](#model-outputs)
+8. [Snow Module](#snow-module)
+9. [Advanced Usage](#advanced-usage)
+10. [Utilities](#utilities)
+11. [Calibration](#calibration)
+12. [Common Errors](#common-errors)
 
 ---
 
@@ -179,6 +180,115 @@ catchment_ml = Catchment(
     input_elevation=500.0,
 )
 ```
+
+---
+
+## Temporal Resolution
+
+PyDrology supports multiple temporal resolutions for forcing data through the `Resolution` enum. Models declare which resolutions they support, and forcing data is validated to match.
+
+### Resolution Enum
+
+```python
+from pydrology import Resolution
+
+# Available resolutions
+Resolution.hourly   # ~1 hour timesteps
+Resolution.daily    # ~24 hour timesteps (default)
+Resolution.monthly  # ~30 day timesteps
+Resolution.annual   # ~365 day timesteps
+```
+
+### Creating ForcingData with Resolution
+
+```python
+from pydrology import Resolution, ForcingData
+import numpy as np
+
+# Daily forcing (default)
+daily_forcing = ForcingData(
+    time=np.arange(365, dtype='datetime64[D]') + np.datetime64('2020-01-01'),
+    precip=precip_data,
+    pet=pet_data,
+    resolution=Resolution.daily,  # Optional, this is the default
+)
+
+# Monthly forcing
+monthly_forcing = ForcingData(
+    time=np.array(['2020-01-01', '2020-02-01', '2020-03-01', ...], dtype='datetime64[D]'),
+    precip=monthly_precip,
+    pet=monthly_pet,
+    resolution=Resolution.monthly,
+)
+```
+
+The time spacing is validated against the declared resolution. If there's a mismatch, a `ValidationError` is raised.
+
+### Aggregating Forcing Data
+
+You can aggregate forcing data from finer to coarser resolution using the `aggregate()` method:
+
+```python
+from pydrology import Resolution, ForcingData
+
+# Start with daily data
+daily_forcing = ForcingData(
+    time=daily_time,
+    precip=daily_precip,
+    pet=daily_pet,
+    temp=daily_temp,
+)
+
+# Aggregate to monthly (requires polars: uv add polars)
+monthly_forcing = daily_forcing.aggregate(Resolution.monthly)
+print(len(monthly_forcing))  # ~12 per year
+
+# Aggregate to annual
+annual_forcing = daily_forcing.aggregate(Resolution.annual)
+```
+
+**Default Aggregation Methods:**
+
+| Field | Method | Rationale |
+|-------|--------|-----------|
+| `precip` | sum | Total precipitation over period |
+| `pet` | sum | Total potential ET over period |
+| `temp` | mean | Average temperature over period |
+
+**Custom Aggregation:**
+
+```python
+# Custom methods per field
+monthly_forcing = daily_forcing.aggregate(
+    Resolution.monthly,
+    methods={"precip": "mean", "pet": "sum", "temp": "mean"},
+)
+```
+
+**Restrictions:**
+- Only coarsening is supported (daily to monthly, not monthly to daily)
+- Requires the `polars` library: `uv add polars`
+
+### Model Resolution Support
+
+Each model declares which resolutions it supports via `SUPPORTED_RESOLUTIONS`:
+
+```python
+from pydrology import get_model
+
+model = get_model("gr6j")
+print(model.SUPPORTED_RESOLUTIONS)  # (Resolution.daily,)
+```
+
+Currently, all models in PyDrology support only daily resolution:
+
+| Model | Supported Resolutions |
+|-------|----------------------|
+| `gr6j` | daily |
+| `gr6j_cemaneige` | daily |
+| `hbv_light` | daily |
+
+If you pass forcing data with an unsupported resolution, the model will raise a `ValueError`.
 
 ---
 
@@ -1408,6 +1518,53 @@ catchment = Catchment(
     hypsometric_curve=np.linspace(200.0, 2000.0, 101),
     input_elevation=500.0,  # Add this!
 )
+```
+
+### "Time spacing (median X hours) does not match resolution 'daily'"
+
+**Cause:** The time spacing in your data doesn't match the declared resolution.
+
+**Solution:** Either fix the resolution parameter or check your time array:
+
+```python
+from pydrology import Resolution, ForcingData
+
+# Option 1: Set correct resolution
+monthly_forcing = ForcingData(
+    time=monthly_time,
+    precip=monthly_precip,
+    pet=monthly_pet,
+    resolution=Resolution.monthly,  # Match to actual data spacing
+)
+
+# Option 2: Verify your time array has expected spacing
+import numpy as np
+gaps = np.diff(time_array)
+print(f"Median gap: {np.median(gaps)}")  # Should be ~24h for daily
+```
+
+### "Cannot aggregate from X to Y; target must be coarser"
+
+**Cause:** You're trying to disaggregate data to a finer resolution.
+
+**Solution:** Aggregation only works from fine to coarse (e.g., daily to monthly):
+
+```python
+# This works
+monthly = daily_forcing.aggregate(Resolution.monthly)
+
+# This raises ValueError - cannot refine resolution
+daily = monthly_forcing.aggregate(Resolution.daily)
+```
+
+### "Polars is required for aggregation"
+
+**Cause:** The `aggregate()` method requires the polars library.
+
+**Solution:** Install polars:
+
+```bash
+uv add polars
 ```
 
 ### "precip array contains NaN values"

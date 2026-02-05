@@ -5,6 +5,8 @@ Includes parameter bounds based on literature values and state size constants
 for the snow routine, soil moisture routine, and response routine.
 """
 
+from pydrology.types import Resolution
+
 # Model parameter names in canonical order
 PARAM_NAMES: tuple[str, ...] = (
     "tt",
@@ -63,3 +65,5 @@ STATE_SIZE: int = compute_state_size(1)  # = 12
 
 # Physics constant
 T_MELT: float = 0.0  # Default threshold temperature for snow/rain partitioning [°C]
+
+SUPPORTED_RESOLUTIONS: tuple[Resolution, ...] = (Resolution.daily,)

@@ -4,6 +4,8 @@ These are fixed values used throughout the GR6J model computations.
 Values are derived from the original Fortran implementation (airGR).
 """
 
+from pydrology.types import Resolution
+
 # Routing split fractions
 B: float = 0.9  # Fraction of PR to UH1 (slow branch)
 C: float = 0.4  # Fraction of UH1 output to exponential store
@@ -31,3 +33,4 @@ DEFAULT_BOUNDS: dict[str, tuple[float, float]] = {
     "x6": (1.0, 50.0),
 }
 STATE_SIZE: int = 63
+SUPPORTED_RESOLUTIONS: tuple[Resolution, ...] = (Resolution.daily,)

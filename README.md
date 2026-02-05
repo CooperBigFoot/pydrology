@@ -72,6 +72,27 @@ print(result.parameters, result.score)
 pareto = calibrate(..., objectives=["nse", "log_nse"])
 ```
 
+## Resolution Support
+
+ForcingData supports multiple temporal resolutions with built-in validation and aggregation:
+
+```python
+from pydrology import Resolution, ForcingData
+
+# Create daily forcing (default)
+forcing = ForcingData(
+    time=time_array,
+    precip=precip_array,
+    pet=pet_array,
+    resolution=Resolution.daily,  # Default, can be omitted
+)
+
+# Aggregate to monthly (requires polars: uv add polars)
+monthly_forcing = forcing.aggregate(Resolution.monthly)
+```
+
+Available resolutions: `hourly`, `daily`, `monthly`, `annual`. Currently all models support daily resolution.
+
 ## Snow Models
 
 For snow-influenced catchments, use `gr6j_cemaneige` or `hbv_light`:

@@ -15,6 +15,7 @@ Every model module must export the following:
 | `PARAM_NAMES` | `tuple[str, ...]` | Parameter names in order (e.g., `("x1", "x2", ...)`) |
 | `DEFAULT_BOUNDS` | `dict[str, tuple[float, float]]` | Parameter bounds: `{name: (min, max)}` |
 | `STATE_SIZE` | `int` | Number of elements in state array representation |
+| `SUPPORTED_RESOLUTIONS` | `tuple[Resolution, ...]` | Supported temporal resolutions for forcing data |
 | `Parameters` | `class` | Frozen dataclass for model parameters |
 | `State` | `class` | Mutable dataclass for model state |
 | `run` | `function` | Execute model over a timeseries |
@@ -176,6 +177,33 @@ Total number of elements in the state array representation.
 STATE_SIZE: int = 63  # For GR6J: 3 stores + 20 UH1 + 40 UH2
 ```
 
+### SUPPORTED_RESOLUTIONS
+
+Tuple of `Resolution` enum values indicating which temporal resolutions the model supports.
+
+```python
+from pydrology.types import Resolution
+
+SUPPORTED_RESOLUTIONS: tuple[Resolution, ...] = (Resolution.daily,)
+```
+
+Models validate that the forcing data resolution is in `SUPPORTED_RESOLUTIONS` before running. If a model supports multiple resolutions:
+
+```python
+# Model that supports both daily and hourly data
+SUPPORTED_RESOLUTIONS: tuple[Resolution, ...] = (Resolution.hourly, Resolution.daily)
+```
+
+The registry validates that all registered models export `SUPPORTED_RESOLUTIONS` and that it is a non-empty tuple of `Resolution` values.
+
+**Current Model Support:**
+
+| Model | Supported Resolutions |
+|-------|----------------------|
+| `gr6j` | daily |
+| `gr6j_cemaneige` | daily |
+| `hbv_light` | daily |
+
 ## Registration
 
 Models auto-register themselves when imported. The registration code should be at the module level:
@@ -196,7 +224,7 @@ Here's a complete minimal model implementation:
 # my_model/__init__.py
 """Minimal model example."""
 
-from .constants import DEFAULT_BOUNDS, PARAM_NAMES, STATE_SIZE
+from .constants import DEFAULT_BOUNDS, PARAM_NAMES, STATE_SIZE, SUPPORTED_RESOLUTIONS
 from .run import run, step
 from .types import Parameters, State
 
@@ -205,6 +233,7 @@ __all__ = [
     "PARAM_NAMES",
     "Parameters",
     "STATE_SIZE",
+    "SUPPORTED_RESOLUTIONS",
     "State",
     "run",
     "step",
@@ -221,6 +250,8 @@ register("my_model", _self)
 # my_model/constants.py
 """Model constants."""
 
+from pydrology.types import Resolution
+
 PARAM_NAMES: tuple[str, ...] = ("capacity", "coefficient")
 
 DEFAULT_BOUNDS: dict[str, tuple[float, float]] = {
@@ -229,6 +260,8 @@ DEFAULT_BOUNDS: dict[str, tuple[float, float]] = {
 }
 
 STATE_SIZE: int = 1  # Single store
+
+SUPPORTED_RESOLUTIONS: tuple[Resolution, ...] = (Resolution.daily,)
 ```
 
 ```python

@@ -44,6 +44,7 @@ from .routing import (
     update_upper_zone,
     upper_zone_outflows,
 )
+from .constants import SUPPORTED_RESOLUTIONS
 from .types import Parameters, State
 
 
@@ -386,7 +387,7 @@ def _run_numba_multizone(
                     sr = 0.0
                 elif sr > 1.0:
                     sr = 1.0
-                recharge = snow_input * (sr ** beta)
+                recharge = snow_input * (sr**beta)
 
             if fc <= 0.0 or lp <= 0.0:
                 et_act = 0.0
@@ -589,9 +590,7 @@ def step(
             zone_temp = temp
             zone_precip = precip
         else:
-            zone_temp = extrapolate_temperature(
-                temp, input_elevation, zone_elevations[zone_idx], temp_gradient
-            )
+            zone_temp = extrapolate_temperature(temp, input_elevation, zone_elevations[zone_idx], temp_gradient)
             zone_precip = extrapolate_precipitation(
                 precip, input_elevation, zone_elevations[zone_idx], precip_gradient, ELEV_CAP_PRECIP
             )
@@ -722,15 +721,17 @@ def run(
     if forcing.temp is None:
         raise ValueError("HBV-light requires temperature data (forcing.temp)")
 
+    # Validate resolution
+    if forcing.resolution not in SUPPORTED_RESOLUTIONS:
+        supported = [r.value for r in SUPPORTED_RESOLUTIONS]
+        msg = f"HBV-light supports resolutions {supported}, got '{forcing.resolution.value}'"
+        raise ValueError(msg)
+
     # Determine zone configuration
     if catchment is not None and catchment.n_layers > 1 and catchment.hypsometric_curve is not None:
         n_zones = catchment.n_layers
-        zone_elevations, zone_fractions = derive_layers(
-            catchment.hypsometric_curve, n_zones
-        )
-        input_elevation = (
-            catchment.input_elevation if catchment.input_elevation is not None else float("nan")
-        )
+        zone_elevations, zone_fractions = derive_layers(catchment.hypsometric_curve, n_zones)
+        input_elevation = catchment.input_elevation if catchment.input_elevation is not None else float("nan")
         temp_gradient = catchment.temp_gradient if catchment.temp_gradient is not None else GRAD_T_DEFAULT
         precip_gradient = catchment.precip_gradient if catchment.precip_gradient is not None else GRAD_P_DEFAULT
     else:
