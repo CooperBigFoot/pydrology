@@ -2,31 +2,15 @@
 ///
 /// - `step()`: Execute a single timestep (single-zone)
 /// - `run()`: Execute over a timeseries with optional multi-zone support
-use super::constants::{ELEV_CAP_PRECIP, GRAD_P_DEFAULT, GRAD_T_DEFAULT};
+use smallvec::smallvec;
+
 use super::fluxes::{Fluxes, FluxesTimeseries, ZoneOutputs};
 use super::params::Parameters;
 use super::processes;
 use super::routing;
 use super::state::State;
+use crate::elevation;
 use crate::traits::HydrologicalModel;
-
-/// Extrapolate temperature to a different elevation using lapse rate.
-fn extrapolate_temp(temp: f64, input_elev: f64, zone_elev: f64, gradient: f64) -> f64 {
-    temp - gradient * (zone_elev - input_elev) / 100.0
-}
-
-/// Extrapolate precipitation to a different elevation using exponential gradient.
-fn extrapolate_precip(
-    precip: f64,
-    input_elev: f64,
-    zone_elev: f64,
-    gradient: f64,
-    cap: f64,
-) -> f64 {
-    let eff_in = input_elev.min(cap);
-    let eff_zone = zone_elev.min(cap);
-    precip * (gradient * (eff_zone - eff_in)).exp()
-}
 
 /// Execute one timestep of HBV-Light for a single zone.
 ///
@@ -78,7 +62,7 @@ pub fn step(
         routing::convolve_triangular(qgw, &state.routing_buffer, uh_weights);
 
     let new_state = State {
-        zone_states: vec![[new_sp, new_lw, new_sm]],
+        zone_states: smallvec![[new_sp, new_lw, new_sm]],
         upper_zone: new_suz,
         lower_zone: new_slz,
         routing_buffer: new_buffer,
@@ -154,8 +138,8 @@ pub fn run(
         }
     };
 
-    let t_grad = temp_gradient.unwrap_or(GRAD_T_DEFAULT);
-    let p_grad = precip_gradient.unwrap_or(GRAD_P_DEFAULT);
+    let t_grad = temp_gradient.unwrap_or(elevation::GRAD_T_DEFAULT);
+    let p_grad = precip_gradient.unwrap_or(elevation::GRAD_P_DEFAULT);
     let skip_extrapolation = input_elevation.is_none();
 
     // Initialize state
@@ -207,8 +191,8 @@ pub fn run(
             } else {
                 let ie = input_elevation.unwrap();
                 (
-                    extrapolate_temp(te, ie, zone_elevs[zone_idx], t_grad),
-                    extrapolate_precip(p, ie, zone_elevs[zone_idx], p_grad, ELEV_CAP_PRECIP),
+                    elevation::extrapolate_temp(te, ie, zone_elevs[zone_idx], t_grad),
+                    elevation::extrapolate_precip_with_cap(p, ie, zone_elevs[zone_idx], p_grad, elevation::ELEV_CAP_PRECIP),
                 )
             };
 
@@ -325,6 +309,7 @@ pub struct HBVContext {
 pub struct HBVLight;
 
 impl HydrologicalModel for HBVLight {
+    const NAME: &'static str = "HBV-Light";
     type Params = Parameters;
     type State = State;
     type Forcing = HBVForcing;
@@ -550,13 +535,13 @@ mod tests {
     #[test]
     fn extrapolate_temp_correct() {
         // 500m input, 1000m zone, 0.6 C/100m gradient
-        let t = extrapolate_temp(10.0, 500.0, 1000.0, 0.6);
+        let t = elevation::extrapolate_temp(10.0, 500.0, 1000.0, 0.6);
         assert!((t - 7.0).abs() < 1e-10); // 10 - 0.6 * 500/100 = 7.0
     }
 
     #[test]
     fn extrapolate_precip_correct() {
-        let p = extrapolate_precip(10.0, 500.0, 500.0, 0.00041, 4000.0);
+        let p = elevation::extrapolate_precip_with_cap(10.0, 500.0, 500.0, 0.00041, 4000.0);
         assert!((p - 10.0).abs() < 1e-10); // same elevation, no change
     }
 }

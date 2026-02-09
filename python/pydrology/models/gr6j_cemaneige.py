@@ -387,7 +387,7 @@ def step(
     Returns:
         Tuple of (new_state, fluxes) where fluxes contains all snow and GR6J outputs.
     """
-    import pydrology._core
+    from pydrology._core import cemaneige as _rust
 
     n_layers = state.n_layers
 
@@ -401,7 +401,7 @@ def step(
     state_arr = np.ascontiguousarray(np.asarray(state), dtype=np.float64)
     params_arr = np.ascontiguousarray(np.asarray(params), dtype=np.float64)
 
-    new_state_arr, fluxes_dict = pydrology._core.cemaneige.gr6j_cemaneige_step(
+    new_state_arr, fluxes_dict = _rust.gr6j_cemaneige_step(
         state_arr,
         params_arr,
         precip,
@@ -428,8 +428,9 @@ def step(
 def run(
     params: Parameters,
     forcing: ForcingData,
-    catchment: Catchment,
     initial_state: State | None = None,
+    *,
+    catchment: Catchment | None = None,
 ) -> ModelOutput[GR6JCemaNeigeFluxes]:
     """Run the GR6J-CemaNeige coupled model over a timeseries.
 
@@ -450,7 +451,7 @@ def run(
     Raises:
         ValueError: If forcing.temp is None (temperature required for snow module).
     """
-    import pydrology._core
+    from pydrology._core import cemaneige as _rust
     from pydrology.models.cemaneige.outputs import SnowLayerOutputs, SnowOutput
     from pydrology.outputs import ModelOutput
     from pydrology.utils.elevation import (
@@ -458,6 +459,11 @@ def run(
         GRAD_T_DEFAULT,
         derive_layers,
     )
+
+    # Validate catchment is provided
+    if catchment is None:
+        msg = "catchment is required for GR6J-CemaNeige (provides mean_annual_solid_precip and layer config)"
+        raise ValueError(msg)
 
     # Validate temperature is provided
     if forcing.temp is None:
@@ -494,8 +500,8 @@ def run(
     initial_state_arr = np.ascontiguousarray(np.asarray(state), dtype=np.float64)
     params_arr = np.ascontiguousarray(np.asarray(params), dtype=np.float64)
 
-    # Call Rust backend
-    snow_result, gr6j_result, layer_result = pydrology._core.cemaneige.gr6j_cemaneige_run(
+    # Call Rust backend (returns a single merged dict)
+    result = _rust.gr6j_cemaneige_run(
         params_arr,
         np.ascontiguousarray(forcing.precip, dtype=np.float64),
         np.ascontiguousarray(forcing.pet, dtype=np.float64),
@@ -516,50 +522,50 @@ def run(
     combined_fluxes = GR6JCemaNeigeFluxes(
         # Snow outputs (10 fields)
         precip_raw=forcing.precip.copy(),
-        snow_pliq=snow_result["snow_pliq"],
-        snow_psol=snow_result["snow_psol"],
-        snow_pack=snow_result["snow_pack"],
-        snow_thermal_state=snow_result["snow_thermal_state"],
-        snow_gratio=snow_result["snow_gratio"],
-        snow_pot_melt=snow_result["snow_pot_melt"],
-        snow_melt=snow_result["snow_melt"],
-        snow_pliq_and_melt=snow_result["snow_pliq_and_melt"],
-        snow_temp=snow_result["snow_temp"],
+        snow_pliq=result["snow_pliq"],
+        snow_psol=result["snow_psol"],
+        snow_pack=result["snow_pack"],
+        snow_thermal_state=result["snow_thermal_state"],
+        snow_gratio=result["snow_gratio"],
+        snow_pot_melt=result["snow_pot_melt"],
+        snow_melt=result["snow_melt"],
+        snow_pliq_and_melt=result["snow_pliq_and_melt"],
+        snow_temp=result["snow_temp"],
         # GR6J outputs (20 fields)
-        pet=gr6j_result["pet"],
-        precip=gr6j_result["precip"],
-        production_store=gr6j_result["production_store"],
-        net_rainfall=gr6j_result["net_rainfall"],
-        storage_infiltration=gr6j_result["storage_infiltration"],
-        actual_et=gr6j_result["actual_et"],
-        percolation=gr6j_result["percolation"],
-        effective_rainfall=gr6j_result["effective_rainfall"],
-        q9=gr6j_result["q9"],
-        q1=gr6j_result["q1"],
-        routing_store=gr6j_result["routing_store"],
-        exchange=gr6j_result["exchange"],
-        actual_exchange_routing=gr6j_result["actual_exchange_routing"],
-        actual_exchange_direct=gr6j_result["actual_exchange_direct"],
-        actual_exchange_total=gr6j_result["actual_exchange_total"],
-        qr=gr6j_result["qr"],
-        qrexp=gr6j_result["qrexp"],
-        exponential_store=gr6j_result["exponential_store"],
-        qd=gr6j_result["qd"],
-        streamflow=gr6j_result["streamflow"],
+        pet=result["pet"],
+        precip=result["precip"],
+        production_store=result["production_store"],
+        net_rainfall=result["net_rainfall"],
+        storage_infiltration=result["storage_infiltration"],
+        actual_et=result["actual_et"],
+        percolation=result["percolation"],
+        effective_rainfall=result["effective_rainfall"],
+        q9=result["q9"],
+        q1=result["q1"],
+        routing_store=result["routing_store"],
+        exchange=result["exchange"],
+        actual_exchange_routing=result["actual_exchange_routing"],
+        actual_exchange_direct=result["actual_exchange_direct"],
+        actual_exchange_total=result["actual_exchange_total"],
+        qr=result["qr"],
+        qrexp=result["qrexp"],
+        exponential_store=result["exponential_store"],
+        qd=result["qd"],
+        streamflow=result["streamflow"],
     )
 
     # Build SnowOutput for backward compatibility
     snow_output = SnowOutput(
         precip_raw=forcing.precip.copy(),
-        snow_pliq=snow_result["snow_pliq"],
-        snow_psol=snow_result["snow_psol"],
-        snow_pack=snow_result["snow_pack"],
-        snow_thermal_state=snow_result["snow_thermal_state"],
-        snow_gratio=snow_result["snow_gratio"],
-        snow_pot_melt=snow_result["snow_pot_melt"],
-        snow_melt=snow_result["snow_melt"],
-        snow_pliq_and_melt=snow_result["snow_pliq_and_melt"],
-        snow_temp=snow_result["snow_temp"],
+        snow_pliq=result["snow_pliq"],
+        snow_psol=result["snow_psol"],
+        snow_pack=result["snow_pack"],
+        snow_thermal_state=result["snow_thermal_state"],
+        snow_gratio=result["snow_gratio"],
+        snow_pot_melt=result["snow_pot_melt"],
+        snow_melt=result["snow_melt"],
+        snow_pliq_and_melt=result["snow_pliq_and_melt"],
+        snow_temp=result["snow_temp"],
         snow_gthreshold=np.full(n_timesteps, catchment.mean_annual_solid_precip * 0.9),
         snow_glocalmax=np.full(n_timesteps, catchment.mean_annual_solid_precip * 0.9),
     )
@@ -570,13 +576,13 @@ def run(
         snow_layers = SnowLayerOutputs(
             layer_elevations=layer_elevations,
             layer_fractions=layer_fractions,
-            snow_pack=layer_result["snow_pack"],
-            snow_thermal_state=layer_result["snow_thermal_state"],
-            snow_gratio=layer_result["snow_gratio"],
-            snow_melt=layer_result["snow_melt"],
-            snow_pliq_and_melt=layer_result["snow_pliq_and_melt"],
-            layer_temp=layer_result["layer_temp"],
-            layer_precip=layer_result["layer_precip"],
+            snow_pack=result["layer_snow_pack"],
+            snow_thermal_state=result["layer_snow_thermal_state"],
+            snow_gratio=result["layer_snow_gratio"],
+            snow_melt=result["layer_snow_melt"],
+            snow_pliq_and_melt=result["layer_snow_pliq_and_melt"],
+            layer_temp=result["layer_temp"],
+            layer_precip=result["layer_precip"],
         )
 
     return ModelOutput(

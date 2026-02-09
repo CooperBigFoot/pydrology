@@ -7,7 +7,6 @@ the complete GR6J model for single timesteps and timeseries respectively.
 import numpy as np
 import pandas as pd
 import pytest
-
 from pydrology import ForcingData, ModelOutput, Parameters, State
 from pydrology.models.gr6j import run, step
 

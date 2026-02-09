@@ -39,3 +39,9 @@ pub const X1_BOUNDS: Bounds = Bounds {
 
 /// Groundwater exchange coefficient [-].
 pub const X2_BOUNDS: Bounds = Bounds { min: 0.2, max: 2.0 };
+
+/// Parameter bounds as (min, max) tuples, in PARAM_NAMES order.
+pub const PARAM_BOUNDS: &[(f64, f64)] = &[
+    (1.0, 2500.0), // x1
+    (0.2, 2.0),    // x2
+];

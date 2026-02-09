@@ -19,7 +19,7 @@ class cemaneige:
         temp_gradient: float | None = None,
         precip_gradient: float | None = None,
         mean_annual_solid_precip: float = 0.0,
-    ) -> tuple[dict[str, numpy.ndarray], dict[str, numpy.ndarray], dict[str, numpy.ndarray]]: ...
+    ) -> dict[str, numpy.ndarray]: ...
     @staticmethod
     def gr6j_cemaneige_step(
         state: numpy.ndarray,

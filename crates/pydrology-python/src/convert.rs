@@ -24,6 +24,19 @@ pub fn checked_slice<'py>(
     Ok(slice)
 }
 
+/// Validate length + contiguity of an optional numpy array.
+/// Returns None if the input is None, otherwise validates and returns the slice.
+pub fn optional_checked_slice<'py>(
+    arr: &'py Option<PyReadonlyArray1<'py, f64>>,
+    expected_len: usize,
+    name: &str,
+) -> PyResult<Option<&'py [f64]>> {
+    match arr {
+        Some(a) => Ok(Some(checked_slice(a, expected_len, name)?)),
+        None => Ok(None),
+    }
+}
+
 /// Validate minimum length + contiguity of a numpy array.
 pub fn checked_slice_min<'py>(
     arr: &'py PyReadonlyArray1<'py, f64>,

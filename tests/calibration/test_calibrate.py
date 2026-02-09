@@ -2,7 +2,6 @@
 
 import numpy as np
 import pytest
-
 from pydrology import Catchment, ForcingData, Parameters
 from pydrology.calibration import ObservedData, Solution, calibrate
 from pydrology.calibration.calibrate import (
@@ -276,7 +275,7 @@ class TestCalibrate:
             streamflow=np.random.default_rng(42).uniform(1.0, 5.0, n_days - warmup),
         )
 
-        with pytest.raises(ValueError, match="requires catchment"):
+        with pytest.raises(ValueError, match="catchment is required"):
             calibrate(
                 model="gr6j_cemaneige",
                 forcing=forcing,

@@ -1,7 +1,8 @@
 /// HBV-Light calibrated parameters.
 ///
 /// 14 parameters that define model behavior.
-use super::constants::{ALL_BOUNDS, N_PARAMS, PARAM_NAMES};
+use super::constants::{ALL_BOUNDS, N_PARAMS, PARAM_BOUNDS, PARAM_NAMES};
+use crate::traits::ModelParams;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Parameters {
@@ -94,6 +95,33 @@ impl Parameters {
     }
 }
 
+impl ModelParams for Parameters {
+    const N_PARAMS: usize = N_PARAMS;
+    const PARAM_NAMES: &'static [&'static str] = PARAM_NAMES;
+    const PARAM_BOUNDS: &'static [(f64, f64)] = PARAM_BOUNDS;
+
+    fn from_array(arr: &[f64]) -> Result<Self, String> {
+        if arr.len() != N_PARAMS {
+            return Err(format!(
+                "expected {} parameters, got {}",
+                N_PARAMS,
+                arr.len()
+            ));
+        }
+        Self::new(
+            arr[0], arr[1], arr[2], arr[3], arr[4], arr[5], arr[6], arr[7], arr[8], arr[9],
+            arr[10], arr[11], arr[12], arr[13],
+        )
+    }
+
+    fn to_array(&self) -> Vec<f64> {
+        vec![
+            self.tt, self.cfmax, self.sfcf, self.cwh, self.cfr, self.fc, self.lp, self.beta,
+            self.k0, self.k1, self.k2, self.perc, self.uzl, self.maxbas,
+        ]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,5 +187,15 @@ mod tests {
             2.5, 10.0, 1.4, 0.2, 0.2, 700.0, 1.0, 6.0, 0.99, 0.5, 0.2, 6.0, 100.0, 7.0
         )
         .is_ok());
+    }
+
+    #[test]
+    fn model_params_roundtrip() {
+        use crate::traits::ModelParams;
+        let p = valid_params();
+        let arr = <Parameters as ModelParams>::to_array(&p);
+        let p2 = <Parameters as ModelParams>::from_array(&arr).unwrap();
+        assert_eq!(p.tt, p2.tt);
+        assert_eq!(p.maxbas, p2.maxbas);
     }
 }

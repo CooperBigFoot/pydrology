@@ -8,10 +8,14 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, fields
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from pydrology.types import Resolution
+
+if TYPE_CHECKING:
+    from pydrology.outputs import ModelOutput
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -147,6 +151,9 @@ class Parameters:
     @classmethod
     def from_array(cls, arr: np.ndarray) -> Parameters:
         """Reconstruct Parameters from array."""
+        if len(arr) != len(PARAM_NAMES):
+            msg = f"Expected array of length {len(PARAM_NAMES)}, got {len(arr)}"
+            raise ValueError(msg)
         return cls(
             tt=float(arr[0]),
             cfmax=float(arr[1]),
@@ -487,7 +494,8 @@ def step(
 
     new_state = State.from_array(np.asarray(new_state_arr), state.n_zones)
 
-    return new_state, fluxes
+    fluxes_converted: dict[str, float] = {k: float(v) for k, v in fluxes.items()}
+    return new_state, fluxes_converted
 
 
 def run(
@@ -495,7 +503,7 @@ def run(
     forcing: object,
     initial_state: State | None = None,
     catchment: object | None = None,
-) -> object:
+) -> ModelOutput[HBVLightFluxes]:
     """Run the HBV-light model over a timeseries.
 
     Args:
@@ -543,17 +551,17 @@ def run(
 
     # Prepare arrays
     params_arr = np.asarray(params, dtype=np.float64)
-    precip_arr = forcing.precip.astype(np.float64)
-    pet_arr = forcing.pet.astype(np.float64)
-    temp_arr = forcing.temp.astype(np.float64)
+    precip_arr = np.ascontiguousarray(forcing.precip, dtype=np.float64)
+    pet_arr = np.ascontiguousarray(forcing.pet, dtype=np.float64)
+    temp_arr = np.ascontiguousarray(forcing.temp, dtype=np.float64)
 
     # Initial state
     state_arr = None
     if initial_state is not None:
         state_arr = np.asarray(initial_state, dtype=np.float64)
 
-    # Call Rust backend
-    fluxes_dict, zone_dict = _rust.hbv_run(
+    # Call Rust backend (returns a single merged dict)
+    result = _rust.hbv_run(
         params_arr,
         precip_arr,
         pet_arr,
@@ -569,45 +577,45 @@ def run(
 
     # Build output object
     hbv_fluxes = HBVLightFluxes(
-        precip=np.asarray(fluxes_dict["precip"]),
-        temp=np.asarray(fluxes_dict["temp"]),
-        pet=np.asarray(fluxes_dict["pet"]),
-        precip_rain=np.asarray(fluxes_dict["precip_rain"]),
-        precip_snow=np.asarray(fluxes_dict["precip_snow"]),
-        snow_pack=np.asarray(fluxes_dict["snow_pack"]),
-        snow_melt=np.asarray(fluxes_dict["snow_melt"]),
-        liquid_water_in_snow=np.asarray(fluxes_dict["liquid_water_in_snow"]),
-        snow_input=np.asarray(fluxes_dict["snow_input"]),
-        soil_moisture=np.asarray(fluxes_dict["soil_moisture"]),
-        recharge=np.asarray(fluxes_dict["recharge"]),
-        actual_et=np.asarray(fluxes_dict["actual_et"]),
-        upper_zone=np.asarray(fluxes_dict["upper_zone"]),
-        lower_zone=np.asarray(fluxes_dict["lower_zone"]),
-        q0=np.asarray(fluxes_dict["q0"]),
-        q1=np.asarray(fluxes_dict["q1"]),
-        q2=np.asarray(fluxes_dict["q2"]),
-        percolation=np.asarray(fluxes_dict["percolation"]),
-        qgw=np.asarray(fluxes_dict["qgw"]),
-        streamflow=np.asarray(fluxes_dict["streamflow"]),
+        precip=np.asarray(result["precip"]),
+        temp=np.asarray(result["temp"]),
+        pet=np.asarray(result["pet"]),
+        precip_rain=np.asarray(result["precip_rain"]),
+        precip_snow=np.asarray(result["precip_snow"]),
+        snow_pack=np.asarray(result["snow_pack"]),
+        snow_melt=np.asarray(result["snow_melt"]),
+        liquid_water_in_snow=np.asarray(result["liquid_water_in_snow"]),
+        snow_input=np.asarray(result["snow_input"]),
+        soil_moisture=np.asarray(result["soil_moisture"]),
+        recharge=np.asarray(result["recharge"]),
+        actual_et=np.asarray(result["actual_et"]),
+        upper_zone=np.asarray(result["upper_zone"]),
+        lower_zone=np.asarray(result["lower_zone"]),
+        q0=np.asarray(result["q0"]),
+        q1=np.asarray(result["q1"]),
+        q2=np.asarray(result["q2"]),
+        percolation=np.asarray(result["percolation"]),
+        qgw=np.asarray(result["qgw"]),
+        streamflow=np.asarray(result["streamflow"]),
     )
 
     # Build per-zone outputs if multi-zone
     zone_outputs: HBVLightZoneOutputs | None = None
-    if zone_dict is not None:
-        n_t = int(zone_dict["n_timesteps"])
-        n_z = int(zone_dict["n_zones"])
+    if "zone_n_timesteps" in result:
+        n_t = int(result["zone_n_timesteps"])
+        n_z = int(result["zone_n_zones"])
         zone_outputs = HBVLightZoneOutputs(
-            zone_elevations=np.asarray(zone_dict["zone_elevations"]),
-            zone_fractions=np.asarray(zone_dict["zone_fractions"]),
-            zone_temp=np.asarray(zone_dict["zone_temp"]).reshape(n_t, n_z),
-            zone_precip=np.asarray(zone_dict["zone_precip"]).reshape(n_t, n_z),
-            snow_pack=np.asarray(zone_dict["snow_pack"]).reshape(n_t, n_z),
-            liquid_water_in_snow=np.asarray(zone_dict["liquid_water_in_snow"]).reshape(n_t, n_z),
-            snow_melt=np.asarray(zone_dict["snow_melt"]).reshape(n_t, n_z),
-            snow_input=np.asarray(zone_dict["snow_input"]).reshape(n_t, n_z),
-            soil_moisture=np.asarray(zone_dict["soil_moisture"]).reshape(n_t, n_z),
-            recharge=np.asarray(zone_dict["recharge"]).reshape(n_t, n_z),
-            actual_et=np.asarray(zone_dict["actual_et"]).reshape(n_t, n_z),
+            zone_elevations=np.asarray(result["zone_elevations"]),
+            zone_fractions=np.asarray(result["zone_fractions"]),
+            zone_temp=np.asarray(result["zone_temp"]).reshape(n_t, n_z),
+            zone_precip=np.asarray(result["zone_precip"]).reshape(n_t, n_z),
+            snow_pack=np.asarray(result["zone_snow_pack"]).reshape(n_t, n_z),
+            liquid_water_in_snow=np.asarray(result["zone_liquid_water_in_snow"]).reshape(n_t, n_z),
+            snow_melt=np.asarray(result["zone_snow_melt"]).reshape(n_t, n_z),
+            snow_input=np.asarray(result["zone_snow_input"]).reshape(n_t, n_z),
+            soil_moisture=np.asarray(result["zone_soil_moisture"]).reshape(n_t, n_z),
+            recharge=np.asarray(result["zone_recharge"]).reshape(n_t, n_z),
+            actual_et=np.asarray(result["zone_actual_et"]).reshape(n_t, n_z),
         )
 
     return ModelOutput(

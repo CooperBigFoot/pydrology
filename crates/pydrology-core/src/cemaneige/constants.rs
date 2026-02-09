@@ -24,8 +24,20 @@ pub const LAYER_STATE_SIZE: usize = 4;
 /// Number of CemaNeige parameters (ctg, kf).
 pub const N_PARAMS: usize = 2;
 
+/// Parameter names in canonical order.
+pub const PARAM_NAMES: &[&str] = &["ctg", "kf"];
+
+/// Parameter bounds as (min, max) tuples, in PARAM_NAMES order.
+pub const PARAM_BOUNDS: &[(f64, f64)] = &[
+    (0.0, 1.0),  // ctg
+    (0.0, 10.0), // kf
+];
+
 /// Number of flux outputs per layer step.
 pub const N_FLUXES: usize = 11;
+
+/// Supported temporal resolutions for forcing data.
+pub const SUPPORTED_RESOLUTIONS: &[crate::forcing::Resolution] = &[crate::forcing::Resolution::Daily];
 
 /// Elevation constants (same as pydrology.utils.elevation).
 pub const GRAD_T_DEFAULT: f64 = 0.6;

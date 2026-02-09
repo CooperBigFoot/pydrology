@@ -7,7 +7,6 @@ the complete GR2M model for single timesteps and timeseries respectively.
 import numpy as np
 import pandas as pd
 import pytest
-
 from pydrology import ForcingData, ModelOutput, Resolution
 from pydrology.models.gr2m import Parameters, State, run, step
 
@@ -32,7 +31,7 @@ def typical_params() -> Parameters:
     """Typical GR2M parameters within valid ranges."""
     return Parameters(
         x1=500.0,  # Production store capacity [mm]
-        x2=1.0,    # Groundwater exchange coefficient [-]
+        x2=1.0,  # Groundwater exchange coefficient [-]
     )
 
 
@@ -127,10 +126,10 @@ class TestStep:
         """Streamflow (Q) should always be >= 0."""
         # Test with various input combinations
         test_inputs = [
-            (80.0, 20.0),   # Normal rainfall
-            (0.0, 100.0),   # Dry month with high PET
-            (200.0, 0.0),   # Heavy rain, no PET
-            (0.0, 0.0),     # No inputs
+            (80.0, 20.0),  # Normal rainfall
+            (0.0, 100.0),  # Dry month with high PET
+            (200.0, 0.0),  # Heavy rain, no PET
+            (0.0, 0.0),  # No inputs
             (10.0, 150.0),  # Low rainfall, high PET
         ]
 
@@ -199,7 +198,7 @@ class TestRun:
         # Create a custom initial state with specific values
         custom_state = State(
             production_store=300.0,  # Different from 0.3 * x1 = 150
-            routing_store=100.0,     # Different from 0.3 * x1 = 150
+            routing_store=100.0,  # Different from 0.3 * x1 = 150
         )
 
         result_custom = run(typical_params, monthly_forcing, initial_state=custom_state)
@@ -341,10 +340,7 @@ class TestMassBalance:
         initial_state = State.initialize(params)
         final_prod = result.fluxes.production_store[-1]
         final_rout = result.fluxes.routing_store[-1]
-        storage_change = (
-            (final_prod - initial_state.production_store)
-            + (final_rout - initial_state.routing_store)
-        )
+        storage_change = (final_prod - initial_state.production_store) + (final_rout - initial_state.routing_store)
 
         # Mass balance: P = Q + ET + dS (approximately)
         mass_balance_error = abs(total_precip - total_streamflow - total_et - storage_change)

@@ -1,7 +1,8 @@
 /// CemaNeige calibrated parameters.
 ///
 /// Two parameters that define the snow model behavior.
-use super::constants::N_PARAMS;
+use super::constants::{N_PARAMS, PARAM_BOUNDS, PARAM_NAMES};
+use crate::traits::ModelParams;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Parameters {
@@ -31,6 +32,27 @@ impl Parameters {
 
     pub fn to_array(&self) -> [f64; N_PARAMS] {
         [self.ctg, self.kf]
+    }
+}
+
+impl ModelParams for Parameters {
+    const N_PARAMS: usize = N_PARAMS;
+    const PARAM_NAMES: &'static [&'static str] = PARAM_NAMES;
+    const PARAM_BOUNDS: &'static [(f64, f64)] = PARAM_BOUNDS;
+
+    fn from_array(arr: &[f64]) -> Result<Self, String> {
+        if arr.len() != Self::N_PARAMS {
+            return Err(format!(
+                "expected {} parameters, got {}",
+                Self::N_PARAMS,
+                arr.len()
+            ));
+        }
+        Self::new(arr[0], arr[1])
+    }
+
+    fn to_array(&self) -> Vec<f64> {
+        vec![self.ctg, self.kf]
     }
 }
 
@@ -68,6 +90,17 @@ mod tests {
         let p = Parameters::new(0.97, 2.5).unwrap();
         let arr = p.to_array();
         let p2 = Parameters::from_array(&arr).unwrap();
+        assert_eq!(p.ctg, p2.ctg);
+        assert_eq!(p.kf, p2.kf);
+    }
+
+    #[test]
+    fn model_params_roundtrip() {
+        use crate::traits::ModelParams;
+
+        let p = Parameters::new(0.97, 2.5).unwrap();
+        let arr = <Parameters as ModelParams>::to_array(&p);
+        let p2 = <Parameters as ModelParams>::from_array(&arr).unwrap();
         assert_eq!(p.ctg, p2.ctg);
         assert_eq!(p.kf, p2.kf);
     }

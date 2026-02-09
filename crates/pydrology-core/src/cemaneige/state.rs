@@ -2,6 +2,7 @@
 ///
 /// Per-layer state for snow pack tracking.
 use super::constants::{GTHRESHOLD_FACTOR, LAYER_STATE_SIZE};
+use crate::traits::ModelState;
 
 /// Single-layer snow state: [snow_pack, thermal_state, gthreshold, glocalmax].
 pub type LayerState = [f64; LAYER_STATE_SIZE];
@@ -53,6 +54,37 @@ impl State {
     }
 }
 
+impl ModelState for State {
+    fn to_vec(&self) -> Vec<f64> {
+        self.to_array()
+    }
+
+    fn from_slice(arr: &[f64]) -> Result<Self, String> {
+        if arr.is_empty() {
+            return Err("state array is empty".to_string());
+        }
+        if arr.len() % LAYER_STATE_SIZE != 0 {
+            return Err(format!(
+                "state array length {} is not a multiple of layer state size {}",
+                arr.len(),
+                LAYER_STATE_SIZE
+            ));
+        }
+        let n_layers = arr.len() / LAYER_STATE_SIZE;
+
+        let mut layer_states = Vec::with_capacity(n_layers);
+        for i in 0..n_layers {
+            let base = i * LAYER_STATE_SIZE;
+            layer_states.push([arr[base], arr[base + 1], arr[base + 2], arr[base + 3]]);
+        }
+        Ok(Self { layer_states })
+    }
+
+    fn array_len(&self) -> usize {
+        self.n_layers() * LAYER_STATE_SIZE
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,5 +121,25 @@ mod tests {
         assert_eq!(s2.layer_states[0][0], 50.0);
         assert_eq!(s2.layer_states[1][1], -2.0);
         assert_eq!(s2.layer_states[0][2], 90.0);
+    }
+
+    #[test]
+    fn model_state_roundtrip() {
+        use crate::traits::ModelState;
+
+        let mut s = State::initialize(2, 100.0);
+        s.layer_states[0][0] = 50.0;
+        let v = s.to_vec();
+        let s2 = State::from_slice(&v).unwrap();
+        assert_eq!(s2.n_layers(), 2);
+        assert_eq!(s2.layer_states[0][0], 50.0);
+    }
+
+    #[test]
+    fn model_state_wrong_length() {
+        use crate::traits::ModelState;
+
+        assert!(State::from_slice(&[]).is_err());
+        assert!(State::from_slice(&[1.0, 2.0, 3.0]).is_err()); // not multiple of 4
     }
 }

@@ -1,4 +1,5 @@
 pub mod cemaneige;
+pub mod elevation;
 pub mod forcing;
 pub mod gr2m;
 pub mod gr6j;

@@ -91,6 +91,9 @@ class Parameters:
     @classmethod
     def from_array(cls, arr: np.ndarray) -> Parameters:
         """Reconstruct Parameters from array."""
+        if len(arr) != len(PARAM_NAMES):
+            msg = f"Expected array of length {len(PARAM_NAMES)}, got {len(arr)}"
+            raise ValueError(msg)
         return cls(
             x1=float(arr[0]),
             x2=float(arr[1]),
@@ -271,12 +274,12 @@ def step(
         - new_state: Updated State object after the timestep
         - fluxes: Dictionary containing all model outputs
     """
-    import pydrology._core
+    from pydrology._core import gr6j as _rust
 
     state_arr = np.asarray(state, dtype=np.float64)
     params_arr = np.asarray(params, dtype=np.float64)
 
-    new_state_arr, fluxes_dict = pydrology._core.gr6j.gr6j_step(
+    new_state_arr, fluxes_dict = _rust.gr6j_step(
         state_arr,
         params_arr,
         precip,
@@ -313,7 +316,7 @@ def run(
         msg = f"GR6J supports resolutions {supported}, got '{forcing.resolution.value}'"
         raise ValueError(msg)
 
-    import pydrology._core
+    from pydrology._core import gr6j as _rust
     from pydrology.outputs import ModelOutput
 
     params_arr = np.asarray(params, dtype=np.float64)
@@ -322,7 +325,7 @@ def run(
     if initial_state is not None:
         initial_state_arr = np.asarray(initial_state, dtype=np.float64)
 
-    result = pydrology._core.gr6j.gr6j_run(
+    result = _rust.gr6j_run(
         params_arr,
         forcing.precip.astype(np.float64),
         forcing.pet.astype(np.float64),

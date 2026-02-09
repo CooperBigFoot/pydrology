@@ -77,6 +77,14 @@ pub fn derive_fluxes(input: TokenStream) -> TokenStream {
         quote! { self.#f.push(f.#f); }
     });
 
+    let with_len_fields = field_idents.iter().map(|f| {
+        quote! { #f: vec![0.0; n] }
+    });
+
+    let write_unchecked_fields = field_idents.iter().map(|f| {
+        quote! { *self.#f.get_unchecked_mut(t) = f.#f; }
+    });
+
     let expanded = quote! {
         /// Auto-generated timeseries struct for collecting per-timestep fluxes.
         #[derive(Debug)]
@@ -92,9 +100,25 @@ pub fn derive_fluxes(input: TokenStream) -> TokenStream {
                 }
             }
 
+            /// Pre-allocate all vectors with exact length, initialized to 0.0.
+            pub fn with_len(n: usize) -> Self {
+                Self {
+                    #(#with_len_fields,)*
+                }
+            }
+
             /// Push a single timestep's fluxes.
             pub fn push(&mut self, f: &#name) {
                 #(#push_fields)*
+            }
+
+            /// Write a single timestep's fluxes at index `t` without bounds checking.
+            ///
+            /// # Safety
+            /// Caller must ensure `t < self.len()` where len is the allocated length.
+            #[inline]
+            pub unsafe fn write_unchecked(&mut self, t: usize, f: &#name) {
+                #(#write_unchecked_fields)*
             }
 
             /// Number of timesteps stored.

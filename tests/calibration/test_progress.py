@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from pydrology.calibration.progress import ProgressTracker, progress_context
 
 

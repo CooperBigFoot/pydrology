@@ -2,10 +2,10 @@
 ///
 /// - `step()`: Execute a single timestep for one layer
 /// - `multi_layer_step()`: Execute with elevation extrapolation
-use super::constants::{ELEV_CAP_PRECIP, GRAD_P_DEFAULT, GRAD_T_DEFAULT};
 use super::params::Parameters;
 use super::processes;
 use super::state::{LayerState, State};
+use crate::elevation;
 
 /// Fluxes output from a single CemaNeige timestep.
 #[derive(Debug, Clone)]
@@ -86,18 +86,6 @@ pub fn step(
     (new_state, fluxes)
 }
 
-/// Extrapolate temperature to a different elevation using lapse rate.
-fn extrapolate_temp(temp: f64, input_elev: f64, layer_elev: f64, gradient: f64) -> f64 {
-    temp - gradient * (layer_elev - input_elev) / 100.0
-}
-
-/// Extrapolate precipitation to a different elevation.
-fn extrapolate_precip(precip: f64, input_elev: f64, layer_elev: f64, gradient: f64) -> f64 {
-    let eff_in = input_elev.min(ELEV_CAP_PRECIP);
-    let eff_layer = layer_elev.min(ELEV_CAP_PRECIP);
-    precip * (gradient * (eff_layer - eff_in)).exp()
-}
-
 /// Execute one timestep of multi-layer CemaNeige with elevation extrapolation.
 ///
 /// Returns (new_state, aggregated_fluxes, per_layer_fluxes).
@@ -114,8 +102,8 @@ pub fn multi_layer_step(
     precip_gradient: Option<f64>,
 ) -> (State, Fluxes, Vec<Fluxes>) {
     let n_layers = state.n_layers();
-    let t_grad = temp_gradient.unwrap_or(GRAD_T_DEFAULT);
-    let p_grad = precip_gradient.unwrap_or(GRAD_P_DEFAULT);
+    let t_grad = temp_gradient.unwrap_or(elevation::GRAD_T_DEFAULT);
+    let p_grad = precip_gradient.unwrap_or(elevation::GRAD_P_DEFAULT);
 
     let mut new_layer_states = Vec::with_capacity(n_layers);
     let mut per_layer_fluxes = Vec::with_capacity(n_layers);
@@ -137,8 +125,8 @@ pub fn multi_layer_step(
         let fraction = layer_fractions[i];
 
         // Extrapolate forcing
-        let layer_temp = extrapolate_temp(temp, input_elevation, layer_elevations[i], t_grad);
-        let layer_precip = extrapolate_precip(precip, input_elevation, layer_elevations[i], p_grad);
+        let layer_temp = elevation::extrapolate_temp(temp, input_elevation, layer_elevations[i], t_grad);
+        let layer_precip = elevation::extrapolate_precip(precip, input_elevation, layer_elevations[i], p_grad);
 
         // Run single-layer step
         let (new_ls, fluxes) = step(&state.layer_states[i], params, layer_precip, layer_temp);

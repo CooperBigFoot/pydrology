@@ -2,7 +2,6 @@
 
 import numpy as np
 import pytest
-
 from pydrology.calibration.metrics import kge, log_nse, mae, nse, pbias, rmse
 
 

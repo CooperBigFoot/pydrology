@@ -5,7 +5,6 @@ according to MODEL_DEFINITION.md equations.
 """
 
 import numpy as np
-
 from pydrology.processes.gr6j import (
     direct_branch,
     exponential_store_update,

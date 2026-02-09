@@ -7,7 +7,6 @@ for the input containers used by the GR6J model.
 import numpy as np
 import pytest
 from pydantic import ValidationError
-
 from pydrology import Catchment, ForcingData
 
 

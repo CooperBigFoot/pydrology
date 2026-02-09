@@ -5,8 +5,6 @@ according to AIRGR_MODEL_DEFINITION.md equations.
 """
 
 import numpy as np
-import pytest
-
 from pydrology.processes.gr2m import (
     compute_streamflow,
     percolation,

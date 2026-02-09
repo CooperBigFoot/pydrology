@@ -1,7 +1,7 @@
 use numpy::{PyArray1, PyReadonlyArray1};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use crate::convert::{checked_slice, checked_slice_min, contiguous_slice};
+use crate::convert::{checked_slice, contiguous_slice};
 
 use pydrology_core::gr6j::constants::NH;
 use pydrology_core::gr6j::params::Parameters;
@@ -37,6 +37,16 @@ define_step_result! {
 // Existing dict-returning functions (backward compatible)
 // ---------------------------------------------------------------------------
 
+/// Run the GR6J model over a timeseries.
+///
+/// Args:
+///     params: 1D array of 6 parameters [x1, x2, x3, x4, x5, x6].
+///     precip: 1D array of daily precipitation [mm/day].
+///     pet: 1D array of daily potential evapotranspiration [mm/day].
+///     initial_state: Optional 1D array of 63 state values.
+///
+/// Returns:
+///     Dictionary mapping flux names to 1D numpy arrays.
 #[pyfunction]
 #[pyo3(signature = (params, precip, pet, initial_state=None))]
 fn gr6j_run<'py>(
@@ -46,8 +56,9 @@ fn gr6j_run<'py>(
     pet: PyReadonlyArray1<'py, f64>,
     initial_state: Option<PyReadonlyArray1<'py, f64>>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let p_slice = checked_slice_min(&params, 6, "params")?;
-    let p = Parameters::new_unchecked(p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5]);
+    let p_slice = checked_slice(&params, 6, "params")?;
+    let p = Parameters::new(p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5])
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
 
     let precip_slice = contiguous_slice(&precip)?;
     let pet_slice = contiguous_slice(&pet)?;
@@ -74,6 +85,18 @@ fn gr6j_run<'py>(
     Ok(dict)
 }
 
+/// Execute one timestep of the GR6J model.
+///
+/// Args:
+///     state: 1D array of 63 state values.
+///     params: 1D array of 6 parameters [x1, x2, x3, x4, x5, x6].
+///     precip: Daily precipitation [mm/day].
+///     pet: Daily potential evapotranspiration [mm/day].
+///     uh1_ordinates: 1D array of 20 UH1 ordinate values.
+///     uh2_ordinates: 1D array of 40 UH2 ordinate values.
+///
+/// Returns:
+///     Tuple of (new_state_array, fluxes_dict).
 #[pyfunction]
 fn gr6j_step<'py>(
     py: Python<'py>,
@@ -84,8 +107,9 @@ fn gr6j_step<'py>(
     uh1_ordinates: PyReadonlyArray1<'py, f64>,
     uh2_ordinates: PyReadonlyArray1<'py, f64>,
 ) -> PyResult<(Bound<'py, PyArray1<f64>>, Bound<'py, PyDict>)> {
-    let p_slice = checked_slice_min(&params, 6, "params")?;
-    let p = Parameters::new_unchecked(p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5]);
+    let p_slice = checked_slice(&params, 6, "params")?;
+    let p = Parameters::new(p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5])
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
 
     let s_slice = checked_slice(&state, 63, "state")?;
     let mut state_arr = [0.0f64; 63];

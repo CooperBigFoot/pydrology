@@ -36,7 +36,23 @@ define_step_result! {
 
 /// Run HBV-Light over a timeseries.
 ///
-/// Returns (fluxes_dict, optional_zone_outputs_dict).
+/// Args:
+///     params: 1D array of 14 parameters.
+///     precip: 1D array of daily precipitation [mm/day].
+///     pet: 1D array of daily potential evapotranspiration [mm/day].
+///     temp: 1D array of daily mean temperature [C].
+///     initial_state: Optional 1D state array.
+///     n_zones: Number of elevation zones (default 1).
+///     zone_elevations: Optional 1D array of zone elevations [m].
+///     zone_fractions: Optional 1D array of zone area fractions [-].
+///     input_elevation: Optional elevation of input measurement [m].
+///     temp_gradient: Optional temperature lapse rate [C/100m].
+///     precip_gradient: Optional precipitation gradient [m^-1].
+///
+/// Returns:
+///     A single dict containing all flux timeseries. When multiple elevation
+///     zones are used, zone-level outputs are added to the same dict with a
+///     ``zone_`` prefix (e.g. ``zone_temp``, ``zone_snow_pack``).
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (
@@ -65,7 +81,7 @@ fn hbv_run<'py>(
     input_elevation: Option<f64>,
     temp_gradient: Option<f64>,
     precip_gradient: Option<f64>,
-) -> PyResult<(Bound<'py, PyDict>, Option<Bound<'py, PyDict>>)> {
+) -> PyResult<Bound<'py, PyDict>> {
     let p_slice = checked_slice(&params, 14, "params")?;
     let p = Parameters::from_array(p_slice)
         .map_err(pyo3::exceptions::PyValueError::new_err)?;
@@ -87,7 +103,7 @@ fn hbv_run<'py>(
     let ze_vec: Vec<f64>;
     let zone_elevs = match &zone_elevations {
         Some(ze) => {
-            ze_vec = ze.as_slice()?.to_vec();
+            ze_vec = contiguous_slice(ze)?.to_vec();
             Some(ze_vec.as_slice())
         }
         None => None,
@@ -96,7 +112,7 @@ fn hbv_run<'py>(
     let zf_vec: Vec<f64>;
     let zone_fracs = match &zone_fractions {
         Some(zf) => {
-            zf_vec = zf.as_slice()?.to_vec();
+            zf_vec = contiguous_slice(zf)?.to_vec();
             Some(zf_vec.as_slice())
         }
         None => None,
@@ -124,51 +140,54 @@ fn hbv_run<'py>(
         upper_zone, lower_zone, q0, q1, q2, percolation, qgw, streamflow,
     );
 
-    // Build zone outputs dict if present
-    let zone_dict = match zone_outputs {
-        Some(zo) => {
-            let zd = PyDict::new(py);
-            zd.set_item("zone_elevations", PyArray1::from_vec(py, zo.zone_elevations))?;
-            zd.set_item("zone_fractions", PyArray1::from_vec(py, zo.zone_fractions))?;
+    // Add zone outputs to the same dict if present
+    if let Some(zo) = zone_outputs {
+        dict.set_item("zone_elevations", PyArray1::from_vec(py, zo.zone_elevations))?;
+        dict.set_item("zone_fractions", PyArray1::from_vec(py, zo.zone_fractions))?;
 
-            // Convert Vec<Vec<f64>> to 2D: flatten to 1D and store shape
-            let n_timesteps = zo.zone_temp.len();
-            let n_z = if n_timesteps > 0 { zo.zone_temp[0].len() } else { 0 };
+        // Convert Vec<Vec<f64>> to 2D: flatten to 1D and store shape
+        let n_timesteps = zo.zone_temp.len();
+        let n_z = if n_timesteps > 0 { zo.zone_temp[0].len() } else { 0 };
 
-            // Helper to flatten 2D Vec<Vec<f64>> to contiguous Vec<f64> (row-major)
-            let flatten_2d = |data: &[Vec<f64>]| -> Vec<f64> {
-                let mut flat = Vec::with_capacity(n_timesteps * n_z);
-                for row in data {
-                    debug_assert_eq!(row.len(), n_z, "zone row length mismatch");
-                    flat.extend_from_slice(row);
-                }
-                flat
-            };
+        // Helper to flatten 2D Vec<Vec<f64>> to contiguous Vec<f64> (row-major)
+        let flatten_2d = |data: &[Vec<f64>]| -> Vec<f64> {
+            let mut flat = Vec::with_capacity(n_timesteps * n_z);
+            for row in data {
+                debug_assert_eq!(row.len(), n_z, "zone row length mismatch");
+                flat.extend_from_slice(row);
+            }
+            flat
+        };
 
-            // Store as flat arrays with shape info for Python to reshape
-            zd.set_item("n_timesteps", n_timesteps)?;
-            zd.set_item("n_zones", n_z)?;
-            zd.set_item("zone_temp", PyArray1::from_vec(py, flatten_2d(&zo.zone_temp)))?;
-            zd.set_item("zone_precip", PyArray1::from_vec(py, flatten_2d(&zo.zone_precip)))?;
-            zd.set_item("snow_pack", PyArray1::from_vec(py, flatten_2d(&zo.snow_pack)))?;
-            zd.set_item("liquid_water_in_snow", PyArray1::from_vec(py, flatten_2d(&zo.liquid_water_in_snow)))?;
-            zd.set_item("snow_melt", PyArray1::from_vec(py, flatten_2d(&zo.snow_melt)))?;
-            zd.set_item("snow_input", PyArray1::from_vec(py, flatten_2d(&zo.snow_input)))?;
-            zd.set_item("soil_moisture", PyArray1::from_vec(py, flatten_2d(&zo.soil_moisture)))?;
-            zd.set_item("recharge", PyArray1::from_vec(py, flatten_2d(&zo.recharge)))?;
-            zd.set_item("actual_et", PyArray1::from_vec(py, flatten_2d(&zo.actual_et)))?;
+        // Store as flat arrays with shape info for Python to reshape
+        dict.set_item("zone_n_timesteps", n_timesteps)?;
+        dict.set_item("zone_n_zones", n_z)?;
+        dict.set_item("zone_temp", PyArray1::from_vec(py, flatten_2d(&zo.zone_temp)))?;
+        dict.set_item("zone_precip", PyArray1::from_vec(py, flatten_2d(&zo.zone_precip)))?;
+        dict.set_item("zone_snow_pack", PyArray1::from_vec(py, flatten_2d(&zo.snow_pack)))?;
+        dict.set_item("zone_liquid_water_in_snow", PyArray1::from_vec(py, flatten_2d(&zo.liquid_water_in_snow)))?;
+        dict.set_item("zone_snow_melt", PyArray1::from_vec(py, flatten_2d(&zo.snow_melt)))?;
+        dict.set_item("zone_snow_input", PyArray1::from_vec(py, flatten_2d(&zo.snow_input)))?;
+        dict.set_item("zone_soil_moisture", PyArray1::from_vec(py, flatten_2d(&zo.soil_moisture)))?;
+        dict.set_item("zone_recharge", PyArray1::from_vec(py, flatten_2d(&zo.recharge)))?;
+        dict.set_item("zone_actual_et", PyArray1::from_vec(py, flatten_2d(&zo.actual_et)))?;
+    }
 
-            Some(zd)
-        }
-        None => None,
-    };
-
-    Ok((dict, zone_dict))
+    Ok(dict)
 }
 
 /// Execute one timestep of HBV-Light.
 ///
-/// Returns (new_state_array, fluxes_dict).
+/// Args:
+///     state: 1D state array.
+///     params: 1D array of 14 parameters.
+///     precip: Daily precipitation [mm/day].
+///     pet: Daily potential evapotranspiration [mm/day].
+///     temp: Daily mean temperature [C].
+///     uh_weights: 1D array of unit hydrograph weights.
+///
+/// Returns:
+///     Tuple of (new_state_array, fluxes_dict).
 #[pyfunction]
 fn hbv_step<'py>(
     py: Python<'py>,
@@ -186,7 +205,7 @@ fn hbv_step<'py>(
     let s_slice = checked_slice(&state, 12, "state")?;
     let s = State::from_array(s_slice, 1);
 
-    let uh_slice = uh_weights.as_slice()?;
+    let uh_slice = contiguous_slice(&uh_weights)?;
 
     let (new_state, fluxes) = run::step(&s, &p, precip, pet, temp, uh_slice);
 

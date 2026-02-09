@@ -2,7 +2,6 @@
 
 import numpy as np
 import pytest
-
 from pydrology.models.hbv_light import Parameters, State
 
 

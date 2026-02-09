@@ -7,7 +7,9 @@
 /// - `x4`: Unit hydrograph time constant [days]
 /// - `x5`: Intercatchment exchange threshold [-]
 /// - `x6`: Exponential store scale parameter [mm]
+use super::constants::{N_PARAMS, PARAM_BOUNDS, PARAM_NAMES};
 use super::constants::{X1_BOUNDS, X2_BOUNDS, X3_BOUNDS, X4_BOUNDS, X5_BOUNDS, X6_BOUNDS};
+use crate::traits::ModelParams;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Parameters {
@@ -84,9 +86,31 @@ impl Parameters {
     }
 }
 
+impl ModelParams for Parameters {
+    const N_PARAMS: usize = N_PARAMS;
+    const PARAM_NAMES: &'static [&'static str] = PARAM_NAMES;
+    const PARAM_BOUNDS: &'static [(f64, f64)] = PARAM_BOUNDS;
+
+    fn from_array(arr: &[f64]) -> Result<Self, String> {
+        if arr.len() != Self::N_PARAMS {
+            return Err(format!(
+                "expected {} parameters, got {}",
+                Self::N_PARAMS,
+                arr.len()
+            ));
+        }
+        Self::new(arr[0], arr[1], arr[2], arr[3], arr[4], arr[5])
+    }
+
+    fn to_array(&self) -> Vec<f64> {
+        vec![self.x1, self.x2, self.x3, self.x4, self.x5, self.x6]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::traits::ModelParams;
 
     #[test]
     fn valid_parameters() {
@@ -163,5 +187,31 @@ mod tests {
     fn boundary_values_are_valid() {
         assert!(Parameters::new(1.0, -5.0, 1.0, 0.5, -4.0, 1.0).is_ok());
         assert!(Parameters::new(2500.0, 5.0, 1000.0, 10.0, 4.0, 50.0).is_ok());
+    }
+
+    #[test]
+    fn from_array_valid() {
+        let p =
+            <Parameters as ModelParams>::from_array(&[350.0, 0.0, 90.0, 1.7, 0.0, 5.0]).unwrap();
+        assert_eq!(p.x1, 350.0);
+        assert_eq!(p.x6, 5.0);
+    }
+
+    #[test]
+    fn from_array_wrong_length() {
+        assert!(<Parameters as ModelParams>::from_array(&[350.0]).is_err());
+        assert!(
+            <Parameters as ModelParams>::from_array(&[350.0, 0.0, 90.0, 1.7, 0.0, 5.0, 1.0])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn to_array_roundtrip() {
+        let p = Parameters::new(350.0, 0.0, 90.0, 1.7, 0.0, 5.0).unwrap();
+        let arr = p.to_array();
+        let p2 = <Parameters as ModelParams>::from_array(&arr).unwrap();
+        assert_eq!(p.x1, p2.x1);
+        assert_eq!(p.x6, p2.x6);
     }
 }

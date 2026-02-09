@@ -3,7 +3,6 @@
 import numpy as np
 import pandas as pd
 import pytest
-
 from pydrology import Catchment, ForcingData, ModelOutput
 from pydrology.models.hbv_light import (
     HBVLightFluxes,
@@ -380,8 +379,9 @@ class TestRunMultiZone:
         # At each timestep, zone temperatures should decrease with zone index
         for t in range(10):
             for z in range(4):
-                assert zone_temps[t, z] > zone_temps[t, z + 1], \
-                    f"Zone {z} should be warmer than zone {z+1} at timestep {t}"
+                assert zone_temps[t, z] > zone_temps[t, z + 1], (
+                    f"Zone {z} should be warmer than zone {z + 1} at timestep {t}"
+                )
 
     def test_single_zone_no_zone_outputs(
         self,
@@ -427,9 +427,7 @@ class TestRunMultiZone:
         # mean of zone snow packs
         zone_snow_packs = result.zone_outputs.snow_pack  # shape (10, 5)
         expected_aggregated = np.mean(zone_snow_packs, axis=1)
-        np.testing.assert_array_almost_equal(
-            result.fluxes.snow_pack, expected_aggregated
-        )
+        np.testing.assert_array_almost_equal(result.fluxes.snow_pack, expected_aggregated)
 
 
 class TestZoneOutputs:

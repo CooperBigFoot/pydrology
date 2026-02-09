@@ -102,6 +102,7 @@ pub struct GR2MForcing {
 pub struct GR2M;
 
 impl HydrologicalModel for GR2M {
+    const NAME: &'static str = "GR2M";
     type Params = Parameters;
     type State = State;
     type Forcing = GR2MForcing;

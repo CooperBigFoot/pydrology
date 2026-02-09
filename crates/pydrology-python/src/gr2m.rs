@@ -31,6 +31,16 @@ define_step_result! {
 // Existing dict-returning functions (backward compatible)
 // ---------------------------------------------------------------------------
 
+/// Run the GR2M model over a timeseries.
+///
+/// Args:
+///     params: 1D array of 2 parameters [x1, x2].
+///     precip: 1D array of monthly precipitation [mm/month].
+///     pet: 1D array of monthly potential evapotranspiration [mm/month].
+///     initial_state: Optional 1D array of 2 state values [production_store, routing_store].
+///
+/// Returns:
+///     Dictionary mapping flux names to 1D numpy arrays.
 #[pyfunction]
 #[pyo3(signature = (params, precip, pet, initial_state=None))]
 fn gr2m_run<'py>(
@@ -68,6 +78,16 @@ fn gr2m_run<'py>(
     Ok(dict)
 }
 
+/// Execute one timestep of the GR2M model.
+///
+/// Args:
+///     state: 1D array of 2 state values [production_store, routing_store].
+///     params: 1D array of 2 parameters [x1, x2].
+///     precip: Monthly precipitation [mm/month].
+///     pet: Monthly potential evapotranspiration [mm/month].
+///
+/// Returns:
+///     Tuple of (new_state_array, fluxes_dict).
 #[pyfunction]
 fn gr2m_step<'py>(
     py: Python<'py>,

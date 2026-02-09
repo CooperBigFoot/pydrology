@@ -8,6 +8,7 @@ name = "pydrology_core"
 
 [dependencies]
 pydrology-macros.workspace = true
+smallvec = "1"
 
 [dev-dependencies]
 approx = "0.5"

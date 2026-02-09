@@ -7,7 +7,6 @@ from types import ModuleType
 
 import numpy as np
 import pytest
-
 from pydrology import registry
 from pydrology.types import Resolution
 
@@ -52,6 +51,7 @@ class TestModelRegistry:
         assert "param_names" in info
         assert "default_bounds" in info
         assert "state_size" in info
+
     def test_get_model_info_param_names(self) -> None:
         """get_model_info returns correct parameter names for GR6J."""
         info = registry.get_model_info("gr6j")
@@ -79,10 +79,39 @@ class TestModelRegistry:
         assert isinstance(info["state_size"], int)
         assert info["state_size"] > 0
 
+    def test_all_four_models_registered(self) -> None:
+        """All 4 models are registered."""
+        models = registry.list_models()
+        assert "gr2m" in models
+        assert "gr6j" in models
+        assert "hbv_light" in models
+        assert "gr6j_cemaneige" in models
+
     def test_get_model_info_raises_for_unknown(self) -> None:
         """get_model_info raises KeyError for unknown model."""
         with pytest.raises(KeyError, match="Unknown model"):
             registry.get_model_info("nonexistent_model")
+
+
+class TestGR2MRegistration:
+    """Tests for the gr2m model registration."""
+
+    def test_gr2m_is_registered(self) -> None:
+        """gr2m model is automatically registered."""
+        models = registry.list_models()
+        assert "gr2m" in models
+
+    def test_gr2m_has_2_parameters(self) -> None:
+        """gr2m has 2 parameters."""
+        info = registry.get_model_info("gr2m")
+        assert len(info["param_names"]) == 2
+        assert len(info["default_bounds"]) == 2
+
+    def test_gr2m_param_names(self) -> None:
+        """gr2m has correct parameter names."""
+        info = registry.get_model_info("gr2m")
+        expected = ("x1", "x2")
+        assert info["param_names"] == expected
 
 
 class TestGR6JCemaNeigeRegistration:
@@ -109,10 +138,31 @@ class TestGR6JCemaNeigeRegistration:
         assert info["param_names"] == expected
 
 
+class TestHBVLightRegistration:
+    """Tests for the hbv_light model registration."""
+
+    def test_hbv_light_is_registered(self) -> None:
+        """hbv_light model is automatically registered."""
+        models = registry.list_models()
+        assert "hbv_light" in models
+
+    def test_hbv_light_has_14_parameters(self) -> None:
+        """hbv_light has 14 parameters."""
+        info = registry.get_model_info("hbv_light")
+        assert len(info["param_names"]) == 14
+        assert len(info["default_bounds"]) == 14
+
+    def test_hbv_light_param_names(self) -> None:
+        """hbv_light has correct parameter names."""
+        info = registry.get_model_info("hbv_light")
+        expected = ("tt", "cfmax", "sfcf", "cwh", "cfr", "fc", "lp", "beta", "k0", "k1", "k2", "perc", "uzl", "maxbas")
+        assert info["param_names"] == expected
+
+
 class TestModelContractValidation:
     """Tests that verify registered models follow the contract."""
 
-    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige"])
+    @pytest.mark.parametrize("model_name", ["gr2m", "gr6j", "hbv_light", "gr6j_cemaneige"])
     def test_model_has_required_exports(self, model_name: str) -> None:
         """Registered model has all required exports."""
         model = registry.get_model(model_name)
@@ -126,7 +176,7 @@ class TestModelContractValidation:
         assert hasattr(model, "run")
         assert hasattr(model, "step")
 
-    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige"])
+    @pytest.mark.parametrize("model_name", ["gr2m", "gr6j", "hbv_light", "gr6j_cemaneige"])
     def test_parameters_class_has_array_protocol(self, model_name: str) -> None:
         """Parameters class supports array conversion."""
         model = registry.get_model(model_name)
@@ -134,7 +184,7 @@ class TestModelContractValidation:
         assert hasattr(model.Parameters, "from_array")
         assert hasattr(model.Parameters, "__array__")
 
-    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige"])
+    @pytest.mark.parametrize("model_name", ["gr2m", "gr6j", "hbv_light", "gr6j_cemaneige"])
     def test_state_class_has_array_protocol(self, model_name: str) -> None:
         """State class supports array conversion."""
         model = registry.get_model(model_name)
@@ -142,14 +192,14 @@ class TestModelContractValidation:
         assert hasattr(model.State, "from_array")
         assert hasattr(model.State, "__array__")
 
-    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige"])
+    @pytest.mark.parametrize("model_name", ["gr2m", "gr6j", "hbv_light", "gr6j_cemaneige"])
     def test_param_names_matches_bounds_length(self, model_name: str) -> None:
         """PARAM_NAMES length matches DEFAULT_BOUNDS length."""
         model = registry.get_model(model_name)
 
         assert len(model.PARAM_NAMES) == len(model.DEFAULT_BOUNDS)
 
-    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige"])
+    @pytest.mark.parametrize("model_name", ["gr2m", "gr6j", "hbv_light", "gr6j_cemaneige"])
     def test_state_size_is_positive_integer(self, model_name: str) -> None:
         """STATE_SIZE is a positive integer."""
         model = registry.get_model(model_name)
@@ -240,26 +290,26 @@ class TestRegisterFunction:
 class TestSupportedResolutionsContract:
     """Tests for SUPPORTED_RESOLUTIONS model contract."""
 
-    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige", "hbv_light"])
+    @pytest.mark.parametrize("model_name", ["gr2m", "gr6j", "hbv_light", "gr6j_cemaneige"])
     def test_model_has_supported_resolutions(self, model_name: str) -> None:
         """Registered model has SUPPORTED_RESOLUTIONS attribute."""
         model = registry.get_model(model_name)
         assert hasattr(model, "SUPPORTED_RESOLUTIONS")
 
-    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige", "hbv_light"])
+    @pytest.mark.parametrize("model_name", ["gr2m", "gr6j", "hbv_light", "gr6j_cemaneige"])
     def test_supported_resolutions_is_tuple(self, model_name: str) -> None:
         """SUPPORTED_RESOLUTIONS is a tuple."""
         model = registry.get_model(model_name)
         assert isinstance(model.SUPPORTED_RESOLUTIONS, tuple)
 
-    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige", "hbv_light"])
+    @pytest.mark.parametrize("model_name", ["gr2m", "gr6j", "hbv_light", "gr6j_cemaneige"])
     def test_supported_resolutions_contains_resolution_enums(self, model_name: str) -> None:
         """SUPPORTED_RESOLUTIONS contains Resolution enum values."""
         model = registry.get_model(model_name)
         for res in model.SUPPORTED_RESOLUTIONS:
             assert isinstance(res, Resolution)
 
-    @pytest.mark.parametrize("model_name", ["gr6j", "gr6j_cemaneige", "hbv_light"])
+    @pytest.mark.parametrize("model_name", ["gr2m", "gr6j", "hbv_light", "gr6j_cemaneige"])
     def test_get_model_info_includes_supported_resolutions(self, model_name: str) -> None:
         """get_model_info returns supported_resolutions."""
         info = registry.get_model_info(model_name)

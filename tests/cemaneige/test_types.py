@@ -6,7 +6,6 @@ for the core data structures used by the CemaNeige snow model.
 
 import numpy as np
 import pytest
-
 from pydrology.cemaneige.types import CemaNeige, CemaNeigeMultiLayerState, CemaNeigeSingleLayerState
 
 

@@ -1,7 +1,7 @@
 use numpy::{PyArray1, PyArray2, PyReadonlyArray1};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use crate::convert::{checked_slice, checked_slice_min, contiguous_slice};
+use crate::convert::{checked_slice, contiguous_slice};
 
 use pydrology_core::cemaneige::constants::LAYER_STATE_SIZE;
 use pydrology_core::cemaneige::coupled;
@@ -35,7 +35,34 @@ define_step_result! {
 
 /// Run the coupled GR6J-CemaNeige model over a timeseries.
 ///
-/// Returns (snow_dict, gr6j_dict, layer_dict).
+/// Args:
+///     params: 1D array of 8 parameters [x1..x6, ctg, kf].
+///     precip: 1D array of daily precipitation [mm/day].
+///     pet: 1D array of daily potential evapotranspiration [mm/day].
+///     temp: 1D array of daily air temperature [C].
+///     initial_state: Optional 1D state array (63 GR6J + n_layers*4 snow).
+///     uh1_ordinates: Ignored (computed internally).
+///     uh2_ordinates: Ignored (computed internally).
+///     n_layers: Number of snow layers (default 1).
+///     layer_elevations: Optional 1D array of layer elevations [m].
+///     layer_fractions: Optional 1D array of layer area fractions [-].
+///     input_elevation: Optional elevation of forcing data [m].
+///     temp_gradient: Optional temperature lapse rate [C/100m].
+///     precip_gradient: Optional precipitation gradient [m^-1].
+///     mean_annual_solid_precip: Mean annual solid precipitation [mm].
+///
+/// Returns:
+///     A single dict containing all outputs:
+///       - Snow outputs (snow_pliq, snow_psol, snow_pack, snow_thermal_state,
+///         snow_gratio, snow_pot_melt, snow_melt, snow_pliq_and_melt, snow_temp)
+///       - GR6J outputs (pet, precip, production_store, net_rainfall,
+///         storage_infiltration, actual_et, percolation, effective_rainfall,
+///         q9, q1, routing_store, exchange, actual_exchange_routing,
+///         actual_exchange_direct, actual_exchange_total, qr, qrexp,
+///         exponential_store, qd, streamflow)
+///       - Layer outputs as 2D arrays (layer_snow_pack, layer_snow_thermal_state,
+///         layer_snow_gratio, layer_snow_melt, layer_snow_pliq_and_melt,
+///         layer_temp, layer_precip)
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (
@@ -70,17 +97,17 @@ fn gr6j_cemaneige_run<'py>(
     temp_gradient: Option<f64>,
     precip_gradient: Option<f64>,
     mean_annual_solid_precip: f64,
-) -> PyResult<(
-    Bound<'py, PyDict>,
-    Bound<'py, PyDict>,
-    Bound<'py, PyDict>,
-)> {
-    let p_slice = checked_slice_min(&params, 8, "params")?;
+) -> PyResult<Bound<'py, PyDict>> {
+    let p_slice = checked_slice(&params, 8, "params")?;
 
-    let gr6j_params =
-        GR6JParameters::new_unchecked(p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5]);
+    let gr6j_params = GR6JParameters::new(
+        p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5],
+    ).map_err(pyo3::exceptions::PyValueError::new_err)?;
     let ctg = p_slice[6];
     let kf = p_slice[7];
+    // Validate CemaNeige params
+    use pydrology_core::cemaneige::params::Parameters as CemaNeigeParameters;
+    let _ = CemaNeigeParameters::new(ctg, kf).map_err(pyo3::exceptions::PyValueError::new_err)?;
 
     let precip_slice = contiguous_slice(&precip)?;
     let pet_slice = contiguous_slice(&pet)?;
@@ -90,11 +117,11 @@ fn gr6j_cemaneige_run<'py>(
     let default_elevs = vec![0.0f64; n_layers];
     let default_fracs = vec![1.0 / n_layers as f64; n_layers];
     let layer_elevs: Vec<f64> = match &layer_elevations {
-        Some(arr) => arr.as_slice()?.to_vec(),
+        Some(arr) => contiguous_slice(arr)?.to_vec(),
         None => default_elevs,
     };
     let layer_fracs: Vec<f64> = match &layer_fractions {
-        Some(arr) => arr.as_slice()?.to_vec(),
+        Some(arr) => contiguous_slice(arr)?.to_vec(),
         None => default_fracs,
     };
 
@@ -105,7 +132,7 @@ fn gr6j_cemaneige_run<'py>(
     // Parse initial state
     let (init_gr6j, init_snow) = match &initial_state {
         Some(s) => {
-            let s_slice = s.as_slice()?;
+            let s_slice = contiguous_slice(s)?;
             let expected = 63 + n_layers * LAYER_STATE_SIZE;
             if s_slice.len() != expected {
                 return Err(pyo3::exceptions::PyValueError::new_err(format!(
@@ -154,19 +181,21 @@ fn gr6j_cemaneige_run<'py>(
         mean_annual_solid_precip,
     );
 
-    // Build snow output dict (uses prefixed keys for backward compat)
-    let snow_dict = PyDict::new(py);
-    snow_dict.set_item("snow_pliq", PyArray1::from_vec(py, result.snow.pliq))?;
-    snow_dict.set_item("snow_psol", PyArray1::from_vec(py, result.snow.psol))?;
-    snow_dict.set_item("snow_pack", PyArray1::from_vec(py, result.snow.snow_pack))?;
-    snow_dict.set_item("snow_thermal_state", PyArray1::from_vec(py, result.snow.thermal_state))?;
-    snow_dict.set_item("snow_gratio", PyArray1::from_vec(py, result.snow.gratio))?;
-    snow_dict.set_item("snow_pot_melt", PyArray1::from_vec(py, result.snow.pot_melt))?;
-    snow_dict.set_item("snow_melt", PyArray1::from_vec(py, result.snow.melt))?;
-    snow_dict.set_item("snow_pliq_and_melt", PyArray1::from_vec(py, result.snow.pliq_and_melt))?;
-    snow_dict.set_item("snow_temp", PyArray1::from_vec(py, result.snow.temp))?;
+    // Build single output dict with all results
+    let dict = PyDict::new(py);
 
-    // Build GR6J output dict
+    // Snow outputs (snow_ prefix)
+    dict.set_item("snow_pliq", PyArray1::from_vec(py, result.snow.pliq))?;
+    dict.set_item("snow_psol", PyArray1::from_vec(py, result.snow.psol))?;
+    dict.set_item("snow_pack", PyArray1::from_vec(py, result.snow.snow_pack))?;
+    dict.set_item("snow_thermal_state", PyArray1::from_vec(py, result.snow.thermal_state))?;
+    dict.set_item("snow_gratio", PyArray1::from_vec(py, result.snow.gratio))?;
+    dict.set_item("snow_pot_melt", PyArray1::from_vec(py, result.snow.pot_melt))?;
+    dict.set_item("snow_melt", PyArray1::from_vec(py, result.snow.melt))?;
+    dict.set_item("snow_pliq_and_melt", PyArray1::from_vec(py, result.snow.pliq_and_melt))?;
+    dict.set_item("snow_temp", PyArray1::from_vec(py, result.snow.temp))?;
+
+    // GR6J outputs (unprefixed) — build via macro then merge
     let gr6j_dict = timeseries_to_dict!(
         py, result.gr6j,
         pet, precip, production_store, net_rainfall, storage_infiltration,
@@ -174,12 +203,13 @@ fn gr6j_cemaneige_run<'py>(
         exchange, actual_exchange_routing, actual_exchange_direct,
         actual_exchange_total, qr, qrexp, exponential_store, qd, streamflow,
     );
+    for (key, value) in gr6j_dict.iter() {
+        dict.set_item(key, value)?;
+    }
 
-    // Build per-layer outputs dict
-    let layer_dict = PyDict::new(py);
+    // Layer outputs as 2D arrays (n_timesteps x n_layers), layer_ prefix
     let n_timesteps = precip_slice.len();
 
-    // Build 2D arrays (n_timesteps x n_layers) for each layer field
     let mut layer_snow_pack = vec![0.0f64; n_timesteps * n_layers];
     let mut layer_thermal = vec![0.0f64; n_timesteps * n_layers];
     let mut layer_gratio = vec![0.0f64; n_timesteps * n_layers];
@@ -203,36 +233,36 @@ fn gr6j_cemaneige_run<'py>(
         }
     }
 
-    layer_dict.set_item(
-        "snow_pack",
+    dict.set_item(
+        "layer_snow_pack",
         PyArray2::from_vec2(py, &to_2d(&layer_snow_pack, n_timesteps, n_layers))?,
     )?;
-    layer_dict.set_item(
-        "snow_thermal_state",
+    dict.set_item(
+        "layer_snow_thermal_state",
         PyArray2::from_vec2(py, &to_2d(&layer_thermal, n_timesteps, n_layers))?,
     )?;
-    layer_dict.set_item(
-        "snow_gratio",
+    dict.set_item(
+        "layer_snow_gratio",
         PyArray2::from_vec2(py, &to_2d(&layer_gratio, n_timesteps, n_layers))?,
     )?;
-    layer_dict.set_item(
-        "snow_melt",
+    dict.set_item(
+        "layer_snow_melt",
         PyArray2::from_vec2(py, &to_2d(&layer_melt, n_timesteps, n_layers))?,
     )?;
-    layer_dict.set_item(
-        "snow_pliq_and_melt",
+    dict.set_item(
+        "layer_snow_pliq_and_melt",
         PyArray2::from_vec2(py, &to_2d(&layer_pliq_and_melt, n_timesteps, n_layers))?,
     )?;
-    layer_dict.set_item(
+    dict.set_item(
         "layer_temp",
         PyArray2::from_vec2(py, &to_2d(&layer_temp, n_timesteps, n_layers))?,
     )?;
-    layer_dict.set_item(
+    dict.set_item(
         "layer_precip",
         PyArray2::from_vec2(py, &to_2d(&layer_precip_arr, n_timesteps, n_layers))?,
     )?;
 
-    Ok((snow_dict, gr6j_dict, layer_dict))
+    Ok(dict)
 }
 
 /// Convert a flat 1D array to a Vec<Vec<f64>> for PyArray2::from_vec2.
@@ -245,7 +275,22 @@ fn to_2d(flat: &[f64], rows: usize, cols: usize) -> Vec<Vec<f64>> {
 
 /// Execute one timestep of the coupled GR6J-CemaNeige model.
 ///
-/// Returns (new_state, fluxes_dict).
+/// Args:
+///     state: 1D state array (63 GR6J + n_layers*4 snow).
+///     params: 1D array of 8 parameters [x1..x6, ctg, kf].
+///     precip: Daily precipitation [mm/day].
+///     pet: Daily potential evapotranspiration [mm/day].
+///     temp: Daily air temperature [C].
+///     uh1_ordinates: 1D array of 20 UH1 ordinate values.
+///     uh2_ordinates: 1D array of 40 UH2 ordinate values.
+///     layer_elevations: 1D array of layer elevations [m].
+///     layer_fractions: 1D array of layer area fractions [-].
+///     input_elevation: Optional elevation of forcing data [m].
+///     temp_gradient: Optional temperature lapse rate [C/100m].
+///     precip_gradient: Optional precipitation gradient [m^-1].
+///
+/// Returns:
+///     Tuple of (new_state_array, fluxes_dict).
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (
@@ -277,12 +322,15 @@ fn gr6j_cemaneige_step<'py>(
     temp_gradient: Option<f64>,
     precip_gradient: Option<f64>,
 ) -> PyResult<(Bound<'py, PyArray1<f64>>, Bound<'py, PyDict>)> {
-    let p_slice = checked_slice_min(&params, 8, "params")?;
+    let p_slice = checked_slice(&params, 8, "params")?;
 
-    let gr6j_params =
-        GR6JParameters::new_unchecked(p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5]);
+    let gr6j_params = GR6JParameters::new(
+        p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5],
+    ).map_err(pyo3::exceptions::PyValueError::new_err)?;
     let ctg = p_slice[6];
     let kf = p_slice[7];
+    use pydrology_core::cemaneige::params::Parameters as CemaNeigeParameters;
+    let _ = CemaNeigeParameters::new(ctg, kf).map_err(pyo3::exceptions::PyValueError::new_err)?;
 
     let elevs = contiguous_slice(&layer_elevations)?;
     let fracs = contiguous_slice(&layer_fractions)?;

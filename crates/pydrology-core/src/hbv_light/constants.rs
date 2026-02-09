@@ -114,6 +114,24 @@ pub const MAXBAS_BOUNDS: Bounds = Bounds {
     max: 7.0,
 };
 
+/// Parameter bounds as (min, max) tuples, in PARAM_NAMES order.
+pub const PARAM_BOUNDS: &[(f64, f64)] = &[
+    (-2.5, 2.5),   // tt
+    (0.5, 10.0),   // cfmax
+    (0.4, 1.4),    // sfcf
+    (0.0, 0.2),    // cwh
+    (0.0, 0.2),    // cfr
+    (50.0, 700.0), // fc
+    (0.3, 1.0),    // lp
+    (1.0, 6.0),    // beta
+    (0.05, 0.99),  // k0
+    (0.01, 0.5),   // k1
+    (0.001, 0.2),  // k2
+    (0.0, 6.0),    // perc
+    (0.0, 100.0),  // uzl
+    (1.0, 7.0),    // maxbas
+];
+
 /// All bounds in parameter order.
 pub const ALL_BOUNDS: [&Bounds; N_PARAMS] = [
     &TT_BOUNDS,

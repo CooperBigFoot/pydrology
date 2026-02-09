@@ -7,7 +7,6 @@ consistent results between step-by-step and full run execution.
 import numpy as np
 import pandas as pd
 import pytest
-
 from pydrology import ForcingData, Parameters, run
 from pydrology.models.gr6j import State, step
 from pydrology.processes.unit_hydrographs import compute_uh_ordinates

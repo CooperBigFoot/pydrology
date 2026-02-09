@@ -3,8 +3,9 @@
 //! Runs CemaNeige snow processing per elevation layer, aggregates liquid output,
 //! then routes it through GR6J.
 
-use super::constants::{ELEV_CAP_PRECIP, LAYER_STATE_SIZE};
+use super::constants::LAYER_STATE_SIZE;
 use super::processes;
+use crate::elevation;
 use crate::gr6j::constants::NH;
 use crate::gr6j::fluxes::{Fluxes as GR6JFluxes, FluxesTimeseries as GR6JFluxesTimeseries};
 use pydrology_macros::Fluxes;
@@ -101,18 +102,6 @@ fn cemaneige_layer_step(
     (new_state, fluxes)
 }
 
-/// Extrapolate temperature to a different elevation.
-fn extrapolate_temp(temp: f64, input_elev: f64, layer_elev: f64, gradient: f64) -> f64 {
-    temp - gradient * (layer_elev - input_elev) / 100.0
-}
-
-/// Extrapolate precipitation to a different elevation.
-fn extrapolate_precip(precip: f64, input_elev: f64, layer_elev: f64, gradient: f64) -> f64 {
-    let eff_in = input_elev.min(ELEV_CAP_PRECIP);
-    let eff_layer = layer_elev.min(ELEV_CAP_PRECIP);
-    precip * (gradient * (eff_layer - eff_in)).exp()
-}
-
 /// Execute one timestep of the coupled GR6J-CemaNeige model.
 ///
 /// Processes snow for each layer, aggregates liquid output, then runs GR6J.
@@ -164,8 +153,8 @@ pub fn coupled_step(
             (temp, precip)
         } else {
             (
-                extrapolate_temp(temp, input_elevation, layer_elevations[i], temp_gradient),
-                extrapolate_precip(precip, input_elevation, layer_elevations[i], precip_gradient),
+                elevation::extrapolate_temp(temp, input_elevation, layer_elevations[i], temp_gradient),
+                elevation::extrapolate_precip(precip, input_elevation, layer_elevations[i], precip_gradient),
             )
         };
 
@@ -209,6 +198,9 @@ pub fn coupled_step(
 }
 
 /// Run the coupled GR6J-CemaNeige model over a timeseries.
+///
+/// Inlines the step logic to eliminate per-timestep heap allocations.
+/// `coupled_step()` is preserved separately for single-step PyO3 use.
 #[allow(clippy::too_many_arguments)]
 pub fn coupled_run(
     gr6j_params: &GR6JParameters,
@@ -228,11 +220,18 @@ pub fn coupled_run(
     mean_annual_solid_precip: f64,
 ) -> CoupledOutput {
     let n = precip.len();
-    assert_eq!(precip.len(), pet.len(), "precip and pet must have the same length");
-    assert_eq!(precip.len(), temp.len(), "precip and temp must have the same length");
+    assert_eq!(
+        precip.len(),
+        pet.len(),
+        "precip and pet must have the same length"
+    );
+    assert_eq!(
+        precip.len(),
+        temp.len(),
+        "precip and temp must have the same length"
+    );
 
     let (uh1_ordinates, uh2_ordinates) = compute_uh_ordinates(gr6j_params.x4);
-
     let skip_extrapolation = input_elevation.is_nan();
 
     // Initialize GR6J state
@@ -241,7 +240,7 @@ pub fn coupled_run(
         None => GR6JState::initialize(gr6j_params),
     };
 
-    // Initialize snow layer states
+    // Initialize snow layer states — owned, mutated in place
     let mut snow_states: Vec<[f64; LAYER_STATE_SIZE]> = match initial_snow_states {
         Some(states) => states.to_vec(),
         None => {
@@ -250,41 +249,97 @@ pub fn coupled_run(
         }
     };
 
+    // Pre-allocate outputs
     let mut snow_ts = SnowTimeseries::with_capacity(n);
     let mut gr6j_ts = GR6JFluxesTimeseries::with_capacity(n);
-    let mut all_layers: Vec<Vec<LayerFluxes>> = Vec::with_capacity(n);
+    // Flat allocation: n_layers per timestep, n timesteps total
+    let mut all_layer_fluxes: Vec<LayerFluxes> = Vec::with_capacity(n * n_layers);
+
+    // Reusable per-timestep buffer for layer fluxes (avoid re-allocation)
+    let mut layer_fluxes_buf: Vec<LayerFluxes> = Vec::with_capacity(n_layers);
 
     for t in 0..n {
-        let (new_gr6j, new_snow, snow_fluxes, gr6j_fluxes, layer_fluxes) = coupled_step(
+        layer_fluxes_buf.clear();
+
+        // Aggregation accumulators
+        let mut agg = SnowFluxes {
+            pliq: 0.0,
+            psol: 0.0,
+            snow_pack: 0.0,
+            thermal_state: 0.0,
+            gratio: 0.0,
+            pot_melt: 0.0,
+            melt: 0.0,
+            pliq_and_melt: 0.0,
+            temp: 0.0,
+            precip: 0.0,
+        };
+
+        for i in 0..n_layers {
+            let (layer_temp, layer_precip) = if skip_extrapolation {
+                (temp[t], precip[t])
+            } else {
+                (
+                    elevation::extrapolate_temp(
+                        temp[t],
+                        input_elevation,
+                        layer_elevations[i],
+                        temp_gradient,
+                    ),
+                    elevation::extrapolate_precip(
+                        precip[t],
+                        input_elevation,
+                        layer_elevations[i],
+                        precip_gradient,
+                    ),
+                )
+            };
+
+            let (new_ls, fluxes) =
+                cemaneige_layer_step(&snow_states[i], ctg, kf, layer_precip, layer_temp);
+            snow_states[i] = new_ls;
+
+            let frac = layer_fractions[i];
+            agg.pliq += fluxes.pliq * frac;
+            agg.psol += fluxes.psol * frac;
+            agg.snow_pack += fluxes.snow_pack * frac;
+            agg.thermal_state += fluxes.thermal_state * frac;
+            agg.gratio += fluxes.gratio * frac;
+            agg.pot_melt += fluxes.pot_melt * frac;
+            agg.melt += fluxes.melt * frac;
+            agg.pliq_and_melt += fluxes.pliq_and_melt * frac;
+            agg.temp += fluxes.temp * frac;
+            agg.precip += fluxes.precip * frac;
+
+            layer_fluxes_buf.push(fluxes);
+        }
+
+        // Feed aggregated liquid to GR6J
+        let (new_gr6j_state, gr6j_fluxes) = gr6j_step(
             &gr6j_state,
-            &snow_states,
             gr6j_params,
-            ctg,
-            kf,
-            precip[t],
+            agg.pliq_and_melt,
             pet[t],
-            temp[t],
             &uh1_ordinates,
             &uh2_ordinates,
-            layer_elevations,
-            layer_fractions,
-            input_elevation,
-            temp_gradient,
-            precip_gradient,
-            skip_extrapolation,
         );
 
-        gr6j_state = new_gr6j;
-        snow_states = new_snow;
-        snow_ts.push(&snow_fluxes);
+        gr6j_state = new_gr6j_state;
+        snow_ts.push(&agg);
         gr6j_ts.push(&gr6j_fluxes);
-        all_layers.push(layer_fluxes);
+        all_layer_fluxes.extend_from_slice(&layer_fluxes_buf);
     }
+
+    // Reshape flat layer fluxes into Vec<Vec<LayerFluxes>>
+    let layers: Vec<Vec<LayerFluxes>> = all_layer_fluxes
+        .chunks_exact(n_layers)
+        .map(|chunk| chunk.to_vec())
+        .collect();
 
     CoupledOutput {
         snow: snow_ts,
         gr6j: gr6j_ts,
-        layers: all_layers,
+        layers,
     }
 }
 

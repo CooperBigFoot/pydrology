@@ -10,7 +10,6 @@ from dataclasses import fields
 import numpy as np
 import pandas as pd
 import pytest
-
 from pydrology import GR6JOutput, ModelOutput, SnowLayerOutputs, SnowOutput
 
 

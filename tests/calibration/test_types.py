@@ -3,7 +3,6 @@
 import numpy as np
 import pytest
 from pydantic import ValidationError
-
 from pydrology import Parameters
 from pydrology.calibration.types import ObservedData, Solution
 

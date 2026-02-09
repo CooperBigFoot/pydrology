@@ -1,8 +1,40 @@
+use std::fmt::Debug;
+
+/// Trait for model parameter types.
+///
+/// Provides uniform array serialization, validation, and metadata.
+pub trait ModelParams: Clone + Copy + Debug {
+    /// Number of parameters.
+    const N_PARAMS: usize;
+    /// Parameter names in canonical order.
+    const PARAM_NAMES: &'static [&'static str];
+    /// Parameter bounds as (min, max) tuples.
+    const PARAM_BOUNDS: &'static [(f64, f64)];
+
+    /// Construct from a slice, validating length and bounds.
+    fn from_array(arr: &[f64]) -> Result<Self, String>;
+    /// Serialize to a Vec.
+    fn to_array(&self) -> Vec<f64>;
+}
+
+/// Trait for model state types.
+///
+/// Provides uniform serialization/deserialization.
+pub trait ModelState: Clone + Debug {
+    /// Serialize state to a flat Vec.
+    fn to_vec(&self) -> Vec<f64>;
+    /// Deserialize state from a flat slice. Never panics.
+    fn from_slice(arr: &[f64]) -> Result<Self, String>;
+    /// Length of the serialized array.
+    fn array_len(&self) -> usize;
+}
+
 /// Core trait for lumped hydrological models.
 ///
 /// Defines the interface all single-zone models implement: prepare context,
 /// initialize state, step, and run over a timeseries.
 pub trait HydrologicalModel {
+    const NAME: &'static str;
     type Params;
     type State: Clone;
     type Forcing: Copy;

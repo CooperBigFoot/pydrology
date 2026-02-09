@@ -6,7 +6,6 @@ extrapolation across elevation bands.
 
 import numpy as np
 import pytest
-
 from pydrology.utils.elevation import (
     derive_layers,
     extrapolate_precipitation,

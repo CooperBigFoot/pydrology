@@ -4,8 +4,6 @@ The actual elevation tests have moved to tests/utils/test_elevation.py.
 These tests verify that the re-exports from cemaneige.layers still work.
 """
 
-import pytest
-
 
 class TestBackwardCompatibility:
     """Verify backward compatible imports from cemaneige.layers."""

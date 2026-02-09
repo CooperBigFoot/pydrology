@@ -7,8 +7,9 @@
 /// - `exponential_store`: Exp — slow drainage store, can be negative [mm]
 /// - `uh1_states`: Convolution states for UH1 (20 elements)
 /// - `uh2_states`: Convolution states for UH2 (40 elements)
-use super::constants::NH;
+use super::constants::{NH, STATE_SIZE};
 use super::params::Parameters;
+use crate::traits::ModelState;
 
 #[derive(Debug, Clone)]
 pub struct State {
@@ -66,6 +67,29 @@ impl State {
     }
 }
 
+impl ModelState for State {
+    fn to_vec(&self) -> Vec<f64> {
+        self.to_array().to_vec()
+    }
+
+    fn from_slice(arr: &[f64]) -> Result<Self, String> {
+        if arr.len() != STATE_SIZE {
+            return Err(format!(
+                "expected {} state elements, got {}",
+                STATE_SIZE,
+                arr.len()
+            ));
+        }
+        let mut fixed = [0.0f64; 63];
+        fixed.copy_from_slice(arr);
+        Ok(Self::from_array(&fixed))
+    }
+
+    fn array_len(&self) -> usize {
+        STATE_SIZE
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -114,5 +138,27 @@ mod tests {
         assert_eq!(s.exponential_store, s2.exponential_store);
         assert_eq!(s.uh1_states, s2.uh1_states);
         assert_eq!(s.uh2_states, s2.uh2_states);
+    }
+
+    #[test]
+    fn model_state_roundtrip() {
+        use crate::traits::ModelState;
+
+        let p = test_params();
+        let s = State::initialize(&p);
+        let v = s.to_vec();
+        let s2 = State::from_slice(&v).unwrap();
+        assert_eq!(s.production_store, s2.production_store);
+        assert_eq!(s.routing_store, s2.routing_store);
+        assert_eq!(s.exponential_store, s2.exponential_store);
+        assert_eq!(s.uh1_states, s2.uh1_states);
+        assert_eq!(s.uh2_states, s2.uh2_states);
+    }
+
+    #[test]
+    fn model_state_wrong_length() {
+        use crate::traits::ModelState;
+
+        assert!(State::from_slice(&[1.0, 2.0]).is_err());
     }
 }

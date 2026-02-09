@@ -2,13 +2,16 @@
 ///
 /// Mutable state that evolves during simulation. Contains per-zone states
 /// for snow and soil, lumped groundwater stores, and routing buffer.
+use smallvec::SmallVec;
+
 use super::constants::{LUMPED_STATE_SIZE, ROUTING_BUFFER_SIZE, ZONE_STATE_SIZE};
 use super::params::Parameters;
+use crate::traits::ModelState;
 
 #[derive(Debug, Clone)]
 pub struct State {
     /// Per-zone states: each inner array is [snow_pack, liquid_water, soil_moisture].
-    pub zone_states: Vec<[f64; ZONE_STATE_SIZE]>,
+    pub zone_states: SmallVec<[[f64; ZONE_STATE_SIZE]; 4]>,
     /// Upper groundwater zone storage [mm].
     pub upper_zone: f64,
     /// Lower groundwater zone storage [mm].
@@ -23,7 +26,8 @@ impl State {
     /// Snow and liquid water start at zero, soil moisture at 50% FC,
     /// groundwater stores at zero, routing buffer at zero.
     pub fn initialize(params: &Parameters, n_zones: usize) -> Self {
-        let mut zone_states = vec![[0.0f64; ZONE_STATE_SIZE]; n_zones];
+        let mut zone_states: SmallVec<[[f64; ZONE_STATE_SIZE]; 4]> =
+            smallvec::smallvec![[0.0f64; ZONE_STATE_SIZE]; n_zones];
         for zs in &mut zone_states {
             zs[2] = 0.5 * params.fc; // soil moisture at 50% FC
         }
@@ -70,7 +74,8 @@ impl State {
             n_zones
         );
 
-        let mut zone_states = Vec::with_capacity(n_zones);
+        let mut zone_states: SmallVec<[[f64; ZONE_STATE_SIZE]; 4]> =
+            SmallVec::with_capacity(n_zones);
         for z in 0..n_zones {
             let base = z * ZONE_STATE_SIZE;
             zone_states.push([arr[base], arr[base + 1], arr[base + 2]]);
@@ -89,6 +94,61 @@ impl State {
             lower_zone: arr[slz_idx],
             routing_buffer,
         }
+    }
+}
+
+impl ModelState for State {
+    fn to_vec(&self) -> Vec<f64> {
+        self.to_array()
+    }
+
+    fn from_slice(arr: &[f64]) -> Result<Self, String> {
+        let fixed_part = LUMPED_STATE_SIZE + ROUTING_BUFFER_SIZE;
+        if arr.len() < fixed_part {
+            return Err(format!(
+                "state array too short: {} < minimum {}",
+                arr.len(),
+                fixed_part
+            ));
+        }
+        let zone_part = arr.len() - fixed_part;
+        if zone_part % ZONE_STATE_SIZE != 0 {
+            return Err(format!(
+                "state array length {} does not align to zone size {} (fixed part {})",
+                arr.len(),
+                ZONE_STATE_SIZE,
+                fixed_part
+            ));
+        }
+        let n_zones = zone_part / ZONE_STATE_SIZE;
+        if n_zones == 0 {
+            return Err("state array implies 0 zones".to_string());
+        }
+
+        let mut zone_states: SmallVec<[[f64; ZONE_STATE_SIZE]; 4]> =
+            SmallVec::with_capacity(n_zones);
+        for z in 0..n_zones {
+            let base = z * ZONE_STATE_SIZE;
+            zone_states.push([arr[base], arr[base + 1], arr[base + 2]]);
+        }
+
+        let suz_idx = n_zones * ZONE_STATE_SIZE;
+        let slz_idx = suz_idx + 1;
+        let buf_start = slz_idx + 1;
+
+        let mut routing_buffer = [0.0; ROUTING_BUFFER_SIZE];
+        routing_buffer.copy_from_slice(&arr[buf_start..buf_start + ROUTING_BUFFER_SIZE]);
+
+        Ok(Self {
+            zone_states,
+            upper_zone: arr[suz_idx],
+            lower_zone: arr[slz_idx],
+            routing_buffer,
+        })
+    }
+
+    fn array_len(&self) -> usize {
+        self.n_zones() * ZONE_STATE_SIZE + LUMPED_STATE_SIZE + ROUTING_BUFFER_SIZE
     }
 }
 
@@ -140,5 +200,24 @@ mod tests {
         assert_eq!(s2.lower_zone, 5.0);
         assert_eq!(s2.routing_buffer[0], 3.0);
         assert_eq!(s2.zone_states[0][2], 125.0);
+    }
+
+    #[test]
+    fn model_state_roundtrip() {
+        let p = test_params();
+        let mut s = State::initialize(&p, 2);
+        s.upper_zone = 10.0;
+        let v = s.to_vec();
+        let s2 = State::from_slice(&v).unwrap();
+        assert_eq!(s2.n_zones(), 2);
+        assert_eq!(s2.upper_zone, 10.0);
+    }
+
+    #[test]
+    fn model_state_wrong_length() {
+        // Not enough for even fixed part (9)
+        assert!(State::from_slice(&[1.0, 2.0]).is_err());
+        // Misaligned: 11 - 9 = 2, 2 % 3 != 0
+        assert!(State::from_slice(&[1.0; 11]).is_err());
     }
 }

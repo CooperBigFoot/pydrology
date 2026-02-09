@@ -89,19 +89,6 @@ def _validate_warmup(warmup: int, forcing_length: int, observed_length: int) -> 
         raise ValueError(msg)
 
 
-def _model_requires_catchment(model: str) -> bool:
-    """Check if a model requires catchment parameter for run().
-
-    Args:
-        model: Model identifier string.
-
-    Returns:
-        True if the model's run() function requires a catchment parameter.
-    """
-    # Models with snow modules require catchment for snow layer configuration
-    return model == "gr6j_cemaneige"
-
-
 def calibrate(
     model: str,
     forcing: ForcingData,
@@ -191,12 +178,6 @@ def calibrate(
     # Get model module from registry
     model_module = get_model(model)
     run_fn = model_module.run
-    requires_catchment = _model_requires_catchment(model)
-
-    # Validate catchment requirement
-    if requires_catchment and catchment is None:
-        msg = f"Model '{model}' requires catchment parameter"
-        raise ValueError(msg)
 
     # Validate and normalize inputs
     objectives_dict = validate_objectives(objectives)
@@ -231,10 +212,10 @@ def calibrate(
 
     # Helper to run the model with the correct signature
     def run_model(params: Any) -> Any:
-        if requires_catchment:
-            return run_fn(params, forcing, catchment, initial_state=initial_state)
-        else:
-            return run_fn(params, forcing, initial_state=initial_state)
+        run_kwargs: dict[str, Any] = {"params": params, "forcing": forcing, "initial_state": initial_state}
+        if catchment is not None:
+            run_kwargs["catchment"] = catchment
+        return run_fn(**run_kwargs)
 
     # Create single-objective evaluation function for GA
     def evaluate_single(x: np.ndarray) -> float:

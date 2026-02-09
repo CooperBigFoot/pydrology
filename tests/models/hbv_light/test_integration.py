@@ -2,7 +2,6 @@
 
 import numpy as np
 import pandas as pd
-
 from pydrology import (
     ForcingData,
     ObservedData,

@@ -65,6 +65,9 @@ class Parameters:
     @classmethod
     def from_array(cls, arr: np.ndarray) -> Parameters:
         """Reconstruct Parameters from array."""
+        if len(arr) != len(PARAM_NAMES):
+            msg = f"Expected array of length {len(PARAM_NAMES)}, got {len(arr)}"
+            raise ValueError(msg)
         return cls(
             x1=float(arr[0]),
             x2=float(arr[1]),
@@ -202,12 +205,13 @@ def step(
         - new_state: Updated State object after the timestep
         - fluxes: Dictionary containing all model outputs
     """
-    from pydrology._core.gr2m import gr2m_step
+    from pydrology._core import gr2m as _rust
 
-    new_state_arr, fluxes = gr2m_step(np.asarray(state), np.asarray(params), precip, pet)
+    new_state_arr, fluxes = _rust.gr2m_step(np.asarray(state), np.asarray(params), precip, pet)
 
     new_state = State.from_array(new_state_arr)
-    return new_state, fluxes
+    fluxes_converted: dict[str, float] = {k: float(v) for k, v in fluxes.items()}
+    return new_state, fluxes_converted
 
 
 def run(
@@ -238,12 +242,12 @@ def run(
         msg = f"GR2M supports resolutions {supported}, got '{forcing.resolution.value}'"
         raise ValueError(msg)
 
-    from pydrology._core.gr2m import gr2m_run
+    from pydrology._core import gr2m as _rust
     from pydrology.outputs import ModelOutput
 
     state_arr = np.asarray(initial_state) if initial_state is not None else None
 
-    result = gr2m_run(
+    result = _rust.gr2m_run(
         np.asarray(params),
         forcing.precip.astype(np.float64),
         forcing.pet.astype(np.float64),

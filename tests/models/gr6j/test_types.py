@@ -6,7 +6,6 @@ for the core data structures used throughout the model.
 
 import numpy as np
 import pytest
-
 from pydrology.models.gr6j import Parameters, State
 
 

@@ -38,6 +38,9 @@ pub const EXP_BRANCH_THRESHOLD: f64 = 7.0;
 
 // -- Model contract constants --
 
+/// Number of parameters.
+pub const N_PARAMS: usize = 6;
+
 /// Parameter names in order.
 pub const PARAM_NAMES: &[&str] = &["x1", "x2", "x3", "x4", "x5", "x6"];
 
@@ -90,3 +93,13 @@ pub const X6_BOUNDS: Bounds = Bounds {
     min: 1.0,
     max: 50.0,
 };
+
+/// Parameter bounds as (min, max) tuples, in PARAM_NAMES order.
+pub const PARAM_BOUNDS: &[(f64, f64)] = &[
+    (1.0, 2500.0), // x1
+    (-5.0, 5.0),   // x2
+    (1.0, 1000.0),  // x3
+    (0.5, 10.0),   // x4
+    (-4.0, 4.0),   // x5
+    (1.0, 50.0),   // x6
+];

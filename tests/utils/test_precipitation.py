@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from pydrology.utils.precipitation import (
     compute_mean_annual_solid_precip,
     compute_solid_fraction,

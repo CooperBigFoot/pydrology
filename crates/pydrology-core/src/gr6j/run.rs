@@ -168,6 +168,7 @@ pub struct GR6JContext {
 pub struct GR6J;
 
 impl HydrologicalModel for GR6J {
+    const NAME: &'static str = "GR6J";
     type Params = Parameters;
     type State = State;
     type Forcing = GR6JForcing;

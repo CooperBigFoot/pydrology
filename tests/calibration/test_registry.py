@@ -3,7 +3,6 @@
 import logging
 
 import pytest
-
 from pydrology.calibration.metrics import (
     METRICS,
     get_metric,

@@ -7,7 +7,6 @@ run() and step() functions.
 import numpy as np
 import pandas as pd
 import pytest
-
 from pydrology import ForcingData, Resolution
 from pydrology.models.gr2m import Parameters, State, run, step
 
@@ -147,8 +146,8 @@ class TestEdgeCases:
         params = Parameters(x1=500, x2=1.0)
         forcing = ForcingData(
             time=pd.date_range("2020-01-01", periods=12, freq="MS").values,
-            precip=np.full(12, 10.0),   # Very low precip
-            pet=np.full(12, 150.0),     # High PET
+            precip=np.full(12, 10.0),  # Very low precip
+            pet=np.full(12, 150.0),  # High PET
             resolution=Resolution.monthly,
         )
         result = run(params, forcing)
@@ -185,8 +184,8 @@ class TestNumericalStability:
         params = Parameters(x1=100, x2=1.0)  # Small X1 to trigger safeguard
         forcing = ForcingData(
             time=pd.date_range("2020-01-01", periods=12, freq="MS").values,
-            precip=np.full(12, 5000.0),   # Very high precip
-            pet=np.full(12, 3000.0),      # Very high PET
+            precip=np.full(12, 5000.0),  # Very high precip
+            pet=np.full(12, 3000.0),  # Very high PET
             resolution=Resolution.monthly,
         )
         result = run(params, forcing)
@@ -198,10 +197,10 @@ class TestNumericalStability:
     def test_extreme_parameter_combinations(self) -> None:
         """Various extreme parameter combinations produce valid outputs."""
         param_sets = [
-            Parameters(x1=1, x2=0.2),     # Minimum-ish values
+            Parameters(x1=1, x2=0.2),  # Minimum-ish values
             Parameters(x1=2500, x2=2.0),  # Maximum values
-            Parameters(x1=500, x2=1.0),   # Typical values
-            Parameters(x1=100, x2=1.5),   # Small store, high exchange
+            Parameters(x1=500, x2=1.0),  # Typical values
+            Parameters(x1=100, x2=1.5),  # Small store, high exchange
             Parameters(x1=2000, x2=0.5),  # Large store, low exchange
         ]
 

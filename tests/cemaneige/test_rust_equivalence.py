@@ -6,8 +6,7 @@ Tests verify that the Rust-backed CemaNeige functions produce correct results.
 import numpy as np
 import pandas as pd
 import pytest
-
-from pydrology import CemaNeige, Catchment, ForcingData
+from pydrology import Catchment, CemaNeige, ForcingData
 from pydrology.cemaneige.run import cemaneige_step
 from pydrology.cemaneige.types import CemaNeigeSingleLayerState
 from pydrology.models.gr6j_cemaneige import Parameters, run
@@ -130,7 +129,7 @@ class TestCoupledSnowRunEquivalence:
 
     def test_single_layer_snow_run(self, params: Parameters, catchment: Catchment, forcing: ForcingData) -> None:
         """Single-layer snow run produces correct outputs."""
-        result = run(params, forcing, catchment)
+        result = run(params, forcing, catchment=catchment)
 
         assert len(result.streamflow) == len(forcing)
         assert np.all(result.streamflow >= 0)
@@ -138,14 +137,14 @@ class TestCoupledSnowRunEquivalence:
 
     def test_snow_pliq_and_melt_sum(self, params: Parameters, catchment: Catchment, forcing: ForcingData) -> None:
         """snow_pliq_and_melt equals snow_pliq + snow_melt."""
-        result = run(params, forcing, catchment)
+        result = run(params, forcing, catchment=catchment)
 
         expected = result.snow.snow_pliq + result.snow.snow_melt
         np.testing.assert_array_almost_equal(result.snow.snow_pliq_and_melt, expected)
 
     def test_precip_raw_matches_input(self, params: Parameters, catchment: Catchment, forcing: ForcingData) -> None:
         """precip_raw matches original input precipitation."""
-        result = run(params, forcing, catchment)
+        result = run(params, forcing, catchment=catchment)
 
         np.testing.assert_array_almost_equal(result.snow.precip_raw, forcing.precip)
 
@@ -190,14 +189,14 @@ class TestMultiLayerSnowEquivalence:
         self, params: Parameters, catchment: Catchment, forcing: ForcingData
     ) -> None:
         """Multi-layer mode produces per-layer outputs."""
-        result = run(params, forcing, catchment)
+        result = run(params, forcing, catchment=catchment)
 
         assert result.snow_layers is not None
         assert result.snow_layers.snow_pack.shape == (len(forcing), catchment.n_layers)
 
     def test_layer_temperature_gradient(self, params: Parameters, catchment: Catchment, forcing: ForcingData) -> None:
         """Higher elevation layers have lower temperatures."""
-        result = run(params, forcing, catchment)
+        result = run(params, forcing, catchment=catchment)
 
         layer_temps = result.snow_layers.layer_temp[0, :]
         for i in range(len(layer_temps) - 1):
@@ -205,7 +204,7 @@ class TestMultiLayerSnowEquivalence:
 
     def test_all_layer_values_finite(self, params: Parameters, catchment: Catchment, forcing: ForcingData) -> None:
         """All layer outputs are finite."""
-        result = run(params, forcing, catchment)
+        result = run(params, forcing, catchment=catchment)
 
         assert np.all(np.isfinite(result.snow_layers.snow_pack))
         assert np.all(np.isfinite(result.snow_layers.layer_temp))
@@ -215,11 +214,9 @@ class TestMultiLayerSnowEquivalence:
         self, params: Parameters, catchment: Catchment, forcing: ForcingData
     ) -> None:
         """Aggregated snow pack matches weighted average of layers."""
-        result = run(params, forcing, catchment)
+        result = run(params, forcing, catchment=catchment)
 
-        weighted_avg = np.sum(
-            result.snow_layers.snow_pack * result.snow_layers.layer_fractions, axis=1
-        )
+        weighted_avg = np.sum(result.snow_layers.snow_pack * result.snow_layers.layer_fractions, axis=1)
         np.testing.assert_array_almost_equal(result.snow.snow_pack, weighted_avg)
 
 
@@ -311,7 +308,7 @@ class TestNumericalStabilitySnow:
             temp=rng.uniform(-10, 20, n),
         )
 
-        result = run(params, forcing, catchment)
+        result = run(params, forcing, catchment=catchment)
 
         assert np.all(np.isfinite(result.streamflow))
         assert np.all(np.isfinite(result.snow.snow_pack))
@@ -334,7 +331,7 @@ class TestNumericalStabilitySnow:
             temp=temps,
         )
 
-        result = run(params, forcing, catchment)
+        result = run(params, forcing, catchment=catchment)
 
         assert result.snow.snow_pack[89] > 0
         spring_melt = result.snow.snow_melt[90:180].sum()

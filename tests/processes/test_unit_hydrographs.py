@@ -10,7 +10,6 @@ Tests verify:
 """
 
 import numpy as np
-
 from pydrology.processes.unit_hydrographs import compute_uh_ordinates, convolve_uh
 
 

@@ -12,10 +12,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 import rasterio
+from pydrology.utils.dem import DEMStatistics, analyze_dem
 from rasterio.crs import CRS
 from rasterio.transform import from_bounds
-
-from pydrology.utils.dem import DEMStatistics, analyze_dem
 
 
 def _create_dem_file(path: Path, data: np.ndarray, nodata: float = -9999.0) -> None:

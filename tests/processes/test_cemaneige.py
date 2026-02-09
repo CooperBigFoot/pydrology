@@ -6,7 +6,6 @@ according to CEMANEIGE.md equations.
 
 import numpy as np
 import pytest
-
 from pydrology.cemaneige.processes import (
     compute_actual_melt,
     compute_gratio,

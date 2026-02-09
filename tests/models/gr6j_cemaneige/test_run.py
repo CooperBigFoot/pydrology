@@ -7,12 +7,10 @@ Tests cover single-layer and multi-layer snow simulation modes.
 import numpy as np
 import pandas as pd
 import pytest
-
 from pydrology import Catchment, ForcingData, SnowLayerOutputs
 from pydrology.models.gr6j_cemaneige import Parameters, State, run, step
-from pydrology.processes.unit_hydrographs import compute_uh_ordinates
 from pydrology.outputs import ModelOutput
-
+from pydrology.processes.unit_hydrographs import compute_uh_ordinates
 
 # Expected flux keys for the coupled model (snow + GR6J)
 EXPECTED_GR6J_FLUX_KEYS = {
@@ -96,7 +94,7 @@ class TestRunWithSnow:
         forcing_with_temp: ForcingData,
     ) -> None:
         """When snow is enabled, output has snow field populated."""
-        result = run(typical_params, forcing_with_temp, typical_catchment)
+        result = run(typical_params, forcing_with_temp, catchment=typical_catchment)
 
         assert isinstance(result, ModelOutput)
         assert result.snow is not None
@@ -114,7 +112,7 @@ class TestRunWithSnow:
             pet=np.array([3.0, 4.0, 5.0, 3.5, 4.0]),
         )
         with pytest.raises(ValueError, match="Temperature"):
-            run(typical_params, forcing, typical_catchment)
+            run(typical_params, forcing, catchment=typical_catchment)
 
     def test_precip_raw_equals_input_precip(
         self,
@@ -123,7 +121,7 @@ class TestRunWithSnow:
         forcing_with_temp: ForcingData,
     ) -> None:
         """precip_raw field matches original input precipitation."""
-        result = run(typical_params, forcing_with_temp, typical_catchment)
+        result = run(typical_params, forcing_with_temp, catchment=typical_catchment)
 
         np.testing.assert_array_almost_equal(
             result.snow.precip_raw,
@@ -137,7 +135,7 @@ class TestRunWithSnow:
         forcing_with_temp: ForcingData,
     ) -> None:
         """precip to GR6J differs from precip_raw (snow preprocessing)."""
-        result = run(typical_params, forcing_with_temp, typical_catchment)
+        result = run(typical_params, forcing_with_temp, catchment=typical_catchment)
 
         # At least some values should differ (cold days accumulate snow)
         # Not all precip passes through unchanged
@@ -156,7 +154,7 @@ class TestRunWithSnow:
             temp=np.array([-10.0, -10.0, -10.0]),  # Very cold
         )
 
-        result = run(typical_params, forcing, typical_catchment)
+        result = run(typical_params, forcing, catchment=typical_catchment)
 
         # Snow pack should increase over cold period
         assert result.snow.snow_pack[-1] > result.snow.snow_pack[0]
@@ -179,7 +177,7 @@ class TestRunWithSnow:
             temp=np.array([15.0, 15.0, 15.0]),  # Warm: all rain
         )
 
-        result = run(typical_params, forcing, typical_catchment)
+        result = run(typical_params, forcing, catchment=typical_catchment)
 
         # All precip should be liquid rain
         np.testing.assert_array_almost_equal(
@@ -211,7 +209,7 @@ class TestRunWithSnow:
             temp=np.array([-10.0] * cold_days + [10.0] * warm_days),  # Cold then warm
         )
 
-        result = run(typical_params, forcing, typical_catchment)
+        result = run(typical_params, forcing, catchment=typical_catchment)
 
         # Snow should accumulate during cold period
         assert result.snow.snow_pack[cold_days - 1] > 0.0
@@ -232,8 +230,8 @@ class TestRunWithSnow:
         # Modify the snow layer state (first layer g value)
         custom_state.snow_layer_states[0, 0] = 100.0  # 100mm snow pack
 
-        result_custom = run(typical_params, forcing_with_temp, typical_catchment, initial_state=custom_state)
-        result_default = run(typical_params, forcing_with_temp, typical_catchment)
+        result_custom = run(typical_params, forcing_with_temp, initial_state=custom_state, catchment=typical_catchment)
+        result_default = run(typical_params, forcing_with_temp, catchment=typical_catchment)
 
         # First row should differ due to different initial snow
         assert result_custom.snow.snow_pack[0] != result_default.snow.snow_pack[0]
@@ -251,7 +249,7 @@ class TestRunWithSnow:
             temp=np.array([0.0] * 5),
         )
 
-        result = run(typical_params, forcing, typical_catchment)
+        result = run(typical_params, forcing, catchment=typical_catchment)
 
         assert len(result) == len(forcing)
 
@@ -262,7 +260,7 @@ class TestRunWithSnow:
         forcing_with_temp: ForcingData,
     ) -> None:
         """All output values are finite when snow enabled."""
-        result = run(typical_params, forcing_with_temp, typical_catchment)
+        result = run(typical_params, forcing_with_temp, catchment=typical_catchment)
 
         for key, values in result.fluxes.to_dict().items():
             assert np.all(np.isfinite(values)), f"Flux field '{key}' has non-finite values"
@@ -301,7 +299,7 @@ class TestRunWithMultiLayerSnow:
         forcing_10_days: ForcingData,
     ) -> None:
         """Multi-layer run produces snow_layers output."""
-        result = run(typical_params, forcing_10_days, multi_layer_catchment)
+        result = run(typical_params, forcing_10_days, catchment=multi_layer_catchment)
 
         assert result.snow_layers is not None
         assert isinstance(result.snow_layers, SnowLayerOutputs)
@@ -313,7 +311,7 @@ class TestRunWithMultiLayerSnow:
         forcing_10_days: ForcingData,
     ) -> None:
         """Snow layer arrays have shape (n_timesteps, n_layers)."""
-        result = run(typical_params, forcing_10_days, multi_layer_catchment)
+        result = run(typical_params, forcing_10_days, catchment=multi_layer_catchment)
 
         assert result.snow_layers.snow_pack.shape == (10, 5)
         assert result.snow_layers.snow_melt.shape == (10, 5)
@@ -327,7 +325,7 @@ class TestRunWithMultiLayerSnow:
         forcing_10_days: ForcingData,
     ) -> None:
         """n_layers property returns correct count."""
-        result = run(typical_params, forcing_10_days, multi_layer_catchment)
+        result = run(typical_params, forcing_10_days, catchment=multi_layer_catchment)
 
         assert result.snow_layers.n_layers == 5
 
@@ -338,7 +336,7 @@ class TestRunWithMultiLayerSnow:
         forcing_10_days: ForcingData,
     ) -> None:
         """Aggregated SnowOutput is still present alongside layer outputs."""
-        result = run(typical_params, forcing_10_days, multi_layer_catchment)
+        result = run(typical_params, forcing_10_days, catchment=multi_layer_catchment)
 
         assert result.snow is not None
         assert len(result.snow.snow_pack) == 10
@@ -350,7 +348,7 @@ class TestRunWithMultiLayerSnow:
         forcing_10_days: ForcingData,
     ) -> None:
         """All output values are finite."""
-        result = run(typical_params, forcing_10_days, multi_layer_catchment)
+        result = run(typical_params, forcing_10_days, catchment=multi_layer_catchment)
 
         for key, values in result.fluxes.to_dict().items():
             assert np.all(np.isfinite(values)), f"Flux '{key}' has non-finite"
@@ -368,7 +366,7 @@ class TestRunWithMultiLayerSnow:
         forcing_10_days: ForcingData,
     ) -> None:
         """Higher elevation layers have colder temperatures."""
-        result = run(typical_params, forcing_10_days, multi_layer_catchment)
+        result = run(typical_params, forcing_10_days, catchment=multi_layer_catchment)
 
         # Check first timestep: layers should have decreasing temperature
         layer_temps = result.snow_layers.layer_temp[0, :]
@@ -382,7 +380,7 @@ class TestRunWithMultiLayerSnow:
         forcing_10_days: ForcingData,
     ) -> None:
         """Single-layer catchment produces no snow_layers output."""
-        result = run(typical_params, forcing_10_days, typical_catchment)
+        result = run(typical_params, forcing_10_days, catchment=typical_catchment)
 
         assert result.snow_layers is None
 
@@ -393,7 +391,7 @@ class TestRunWithMultiLayerSnow:
         forcing_10_days: ForcingData,
     ) -> None:
         """Layer elevations are stored in the output."""
-        result = run(typical_params, forcing_10_days, multi_layer_catchment)
+        result = run(typical_params, forcing_10_days, catchment=multi_layer_catchment)
 
         assert len(result.snow_layers.layer_elevations) == 5
         # Elevations should be monotonically increasing

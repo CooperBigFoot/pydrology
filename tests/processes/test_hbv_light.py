@@ -2,7 +2,6 @@
 
 import numpy as np
 import pytest
-
 from pydrology.processes.hbv_light import (
     compute_actual_et,
     compute_melt,
