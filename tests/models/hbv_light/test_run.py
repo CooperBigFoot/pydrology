@@ -5,10 +5,14 @@ import pandas as pd
 import pytest
 
 from pydrology import Catchment, ForcingData, ModelOutput
-from pydrology.models.hbv_light.outputs import HBVLightFluxes
-from pydrology.models.hbv_light.routing import compute_triangular_weights
-from pydrology.models.hbv_light.run import run, step
-from pydrology.models.hbv_light.types import Parameters, State
+from pydrology.models.hbv_light import (
+    HBVLightFluxes,
+    Parameters,
+    State,
+    compute_triangular_weights,
+    run,
+    step,
+)
 
 # Expected flux keys
 EXPECTED_FLUX_KEYS = {

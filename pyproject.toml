@@ -27,7 +27,7 @@ build-backend = "maturin"
 [tool.maturin]
 python-source = "python"
 module-name = "pydrology._core"
-features = ["python"]
+manifest-path = "crates/pydrology-python/Cargo.toml"
 
 [dependency-groups]
 dev = [

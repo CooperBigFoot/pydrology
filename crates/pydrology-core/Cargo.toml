@@ -1,0 +1,21 @@
+[package]
+name = "pydrology-core"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "pydrology_core"
+
+[dependencies]
+pydrology-macros.workspace = true
+
+[dev-dependencies]
+approx = "0.5"
+
+[[bin]]
+name = "pydrology-demo"
+path = "src/bin/demo.rs"
+
+[[bin]]
+name = "bench"
+path = "src/bin/bench.rs"

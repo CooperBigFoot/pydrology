@@ -14,7 +14,6 @@ from .constants import (
 )
 
 
-
 def production_store_update(
     precip: float, pet: float, production_store: float, x1: float
 ) -> tuple[float, float, float, float]:
@@ -81,7 +80,6 @@ def production_store_update(
     return new_store, actual_et, net_rainfall_pn, effective_rainfall_pr
 
 
-
 def percolation(production_store: float, x1: float) -> tuple[float, float]:
     """Compute percolation from the production store.
 
@@ -111,7 +109,6 @@ def percolation(production_store: float, x1: float) -> tuple[float, float]:
     return new_store, percolation_amount
 
 
-
 def groundwater_exchange(routing_store: float, x2: float, x3: float, x5: float) -> float:
     """Compute potential groundwater exchange.
 
@@ -128,7 +125,6 @@ def groundwater_exchange(routing_store: float, x2: float, x3: float, x5: float) 
         Potential exchange F (mm/day). Positive = import, negative = export.
     """
     return x2 * (routing_store / x3 - x5)
-
 
 
 def routing_store_update(
@@ -179,7 +175,6 @@ def routing_store_update(
     return new_store, outflow_qr, actual_exchange
 
 
-
 def exponential_store_update(exp_store: float, uh1_output: float, exchange: float, x6: float) -> tuple[float, float]:
     """Update the exponential store and compute outflow.
 
@@ -221,7 +216,6 @@ def exponential_store_update(exp_store: float, uh1_output: float, exchange: floa
     new_store = store - outflow_qrexp
 
     return new_store, outflow_qrexp
-
 
 
 def direct_branch(uh2_output: float, exchange: float) -> tuple[float, float]:

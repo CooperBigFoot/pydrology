@@ -107,8 +107,7 @@ def validate_objectives(objectives: list[str] | dict[str, str]) -> dict[str, str
         _, registered_direction = METRICS[name]
         if direction != registered_direction:
             logger.warning(
-                "Metric '%s' has registered direction '%s', but you specified '%s'. "
-                "This is unusual - are you sure?",
+                "Metric '%s' has registered direction '%s', but you specified '%s'. This is unusual - are you sure?",
                 name,
                 registered_direction,
                 direction,

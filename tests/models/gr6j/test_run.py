@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from pydrology import ForcingData, ModelOutput, Parameters, State
-from pydrology.models.gr6j.run import run, step
+from pydrology.models.gr6j import run, step
 
 # Expected flux keys returned by step() - all 20 MISC outputs
 EXPECTED_FLUX_KEYS = {
@@ -68,7 +68,7 @@ def initialized_state(typical_params: Parameters) -> State:
 @pytest.fixture
 def uh_ordinates(typical_params: Parameters) -> tuple[np.ndarray, np.ndarray]:
     """Pre-computed unit hydrograph ordinates."""
-    from pydrology.models.gr6j.unit_hydrographs import compute_uh_ordinates
+    from pydrology.processes.unit_hydrographs import compute_uh_ordinates
 
     return compute_uh_ordinates(typical_params.x4)
 

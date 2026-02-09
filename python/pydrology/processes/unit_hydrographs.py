@@ -8,7 +8,7 @@ UH1 is faster (length NH=20 days), UH2 is slower (length 2*NH=40 days).
 
 import numpy as np
 
-from .constants import D, NH
+from .constants import NH, D
 
 
 def compute_uh_ordinates(x4: float) -> tuple[np.ndarray, np.ndarray]:
@@ -62,7 +62,6 @@ def compute_uh_ordinates(x4: float) -> tuple[np.ndarray, np.ndarray]:
     return uh1_ordinates, uh2_ordinates
 
 
-
 def _ss1(i: float, x4: float) -> float:
     """Compute UH1 S-curve value at position i.
 
@@ -79,7 +78,6 @@ def _ss1(i: float, x4: float) -> float:
         return (i / x4) ** D
     else:
         return 1.0
-
 
 
 def _ss2(i: float, x4: float) -> float:
@@ -100,7 +98,6 @@ def _ss2(i: float, x4: float) -> float:
         return 1.0 - 0.5 * (2.0 - i / x4) ** D
     else:
         return 1.0
-
 
 
 def convolve_uh(uh_states: np.ndarray, pr_input: float, uh_ordinates: np.ndarray) -> tuple[np.ndarray, float]:

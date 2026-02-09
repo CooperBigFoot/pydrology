@@ -49,7 +49,6 @@ def derive_layers(hypsometric_curve: np.ndarray, n_layers: int) -> tuple[np.ndar
     return layer_elevations, layer_fractions
 
 
-
 def extrapolate_temperature(
     input_temp: float,
     input_elevation: float,
@@ -71,7 +70,6 @@ def extrapolate_temperature(
         Extrapolated temperature at target elevation [°C].
     """
     return input_temp - gradient * (layer_elevation - input_elevation) / 100.0
-
 
 
 def extrapolate_precipitation(

@@ -11,7 +11,7 @@ Tests verify:
 
 import numpy as np
 
-from pydrology.models.gr6j.unit_hydrographs import compute_uh_ordinates, convolve_uh
+from pydrology.processes.unit_hydrographs import compute_uh_ordinates, convolve_uh
 
 
 class TestComputeUhOrdinates:

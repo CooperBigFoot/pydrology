@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pydrology.models.hbv_light.types import Parameters, State
+from pydrology.models.hbv_light import Parameters, State
 
 
 class TestParameters:

@@ -3,18 +3,16 @@
 import numpy as np
 import pytest
 
-from pydrology.models.hbv_light.processes import (
+from pydrology.processes.hbv_light import (
     compute_actual_et,
     compute_melt,
+    compute_percolation,
     compute_recharge,
     compute_refreezing,
-    partition_precipitation,
-)
-from pydrology.models.hbv_light.routing import (
-    compute_percolation,
     compute_triangular_weights,
     convolve_triangular,
     lower_zone_outflow,
+    partition_precipitation,
     upper_zone_outflows,
 )
 

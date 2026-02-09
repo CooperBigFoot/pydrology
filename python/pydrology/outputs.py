@@ -17,10 +17,10 @@ import pandas as pd
 
 # Re-export from model-specific modules for backward compatibility
 from pydrology.models.cemaneige.outputs import SnowLayerOutputs, SnowOutput
-from pydrology.models.gr6j.outputs import GR6JFluxes, GR6JOutput
+from pydrology.models.gr6j import GR6JFluxes, GR6JOutput
 
 if TYPE_CHECKING:
-    from pydrology.models.hbv_light.outputs import HBVLightZoneOutputs
+    from pydrology.models.hbv_light import HBVLightZoneOutputs
 
 __all__ = ["GR6JFluxes", "GR6JOutput", "ModelOutput", "SnowLayerOutputs", "SnowOutput"]
 

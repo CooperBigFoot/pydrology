@@ -20,7 +20,6 @@ class cemaneige:
         precip_gradient: float | None = None,
         mean_annual_solid_precip: float = 0.0,
     ) -> tuple[dict[str, numpy.ndarray], dict[str, numpy.ndarray], dict[str, numpy.ndarray]]: ...
-
     @staticmethod
     def gr6j_cemaneige_step(
         state: numpy.ndarray,
@@ -45,7 +44,6 @@ class gr2m:
         pet: numpy.ndarray,
         initial_state: numpy.ndarray | None = None,
     ) -> dict[str, numpy.ndarray]: ...
-
     @staticmethod
     def gr2m_step(
         state: numpy.ndarray,
@@ -69,7 +67,6 @@ class hbv_light:
         temp_gradient: float | None = None,
         precip_gradient: float | None = None,
     ) -> tuple[dict[str, numpy.ndarray], dict[str, object] | None]: ...
-
     @staticmethod
     def hbv_step(
         state: numpy.ndarray,
@@ -79,7 +76,6 @@ class hbv_light:
         temp: float,
         uh_weights: numpy.ndarray,
     ) -> tuple[numpy.ndarray, dict[str, float]]: ...
-
     @staticmethod
     def hbv_triangular_weights(
         maxbas: float,

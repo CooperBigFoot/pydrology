@@ -8,7 +8,6 @@ _T_MELT: float = 0.0  # Melt threshold [°C]
 _MIN_SPEED: float = 0.1  # Minimum melt fraction [-]
 
 
-
 def compute_solid_fraction(temp: float) -> float:
     """Compute fraction of precipitation falling as snow using USACE formula.
 
@@ -31,7 +30,6 @@ def compute_solid_fraction(temp: float) -> float:
     return (3.0 - temp) / 4.0
 
 
-
 def partition_precipitation(precip: float, solid_fraction: float) -> tuple[float, float]:
     """Split precipitation into liquid and solid components.
 
@@ -50,7 +48,6 @@ def partition_precipitation(precip: float, solid_fraction: float) -> tuple[float
     pliq = (1.0 - solid_fraction) * precip
     psol = solid_fraction * precip
     return pliq, psol
-
 
 
 def update_thermal_state(etg: float, temp: float, ctg: float) -> float:
@@ -76,7 +73,6 @@ def update_thermal_state(etg: float, temp: float, ctg: float) -> float:
     """
     new_etg = ctg * etg + (1.0 - ctg) * temp
     return min(new_etg, 0.0)
-
 
 
 def compute_potential_melt(etg: float, temp: float, kf: float, snow_pack: float) -> float:
@@ -106,7 +102,6 @@ def compute_potential_melt(etg: float, temp: float, kf: float, snow_pack: float)
     return 0.0
 
 
-
 def compute_gratio(snow_pack: float, gthreshold: float) -> float:
     """Compute snow cover fraction (Gratio).
 
@@ -134,7 +129,6 @@ def compute_gratio(snow_pack: float, gthreshold: float) -> float:
     if snow_pack >= gthreshold:
         return 1.0
     return snow_pack / gthreshold
-
 
 
 def compute_actual_melt(potential_melt: float, gratio: float) -> float:

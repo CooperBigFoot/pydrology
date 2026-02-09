@@ -27,7 +27,9 @@ def nse(observed: ArrayLike, simulated: ArrayLike) -> float:
 
     Range: (-inf, 1], where 1 is perfect match.
     """
-    return float(rust_nse(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)))
+    return float(
+        rust_nse(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64))
+    )
 
 
 @register("maximize")
@@ -39,7 +41,11 @@ def log_nse(observed: ArrayLike, simulated: ArrayLike) -> float:
 
     Range: (-inf, 1], where 1 is perfect match.
     """
-    return float(rust_log_nse(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)))
+    return float(
+        rust_log_nse(
+            np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)
+        )
+    )
 
 
 @register("maximize")
@@ -55,7 +61,9 @@ def kge(observed: ArrayLike, simulated: ArrayLike) -> float:
 
     Range: (-inf, 1], where 1 is perfect match.
     """
-    return float(rust_kge(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)))
+    return float(
+        rust_kge(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64))
+    )
 
 
 @register("minimize")
@@ -67,7 +75,9 @@ def pbias(observed: ArrayLike, simulated: ArrayLike) -> float:
     Positive PBIAS = overestimation, negative = underestimation.
     Optimal value is 0.
     """
-    return float(rust_pbias(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)))
+    return float(
+        rust_pbias(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64))
+    )
 
 
 @register("minimize")
@@ -78,7 +88,9 @@ def rmse(observed: ArrayLike, simulated: ArrayLike) -> float:
 
     Range: [0, inf), where 0 is perfect match.
     """
-    return float(rust_rmse(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)))
+    return float(
+        rust_rmse(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64))
+    )
 
 
 @register("minimize")
@@ -89,4 +101,6 @@ def mae(observed: ArrayLike, simulated: ArrayLike) -> float:
 
     Range: [0, inf), where 0 is perfect match.
     """
-    return float(rust_mae(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)))
+    return float(
+        rust_mae(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64))
+    )

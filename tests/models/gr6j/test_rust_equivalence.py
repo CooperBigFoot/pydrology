@@ -9,9 +9,8 @@ import pandas as pd
 import pytest
 
 from pydrology import ForcingData, Parameters, run
-from pydrology.models.gr6j.run import step
-from pydrology.models.gr6j.types import State
-from pydrology.models.gr6j.unit_hydrographs import compute_uh_ordinates
+from pydrology.models.gr6j import State, step
+from pydrology.processes.unit_hydrographs import compute_uh_ordinates
 
 
 class TestStepRunEquivalence:

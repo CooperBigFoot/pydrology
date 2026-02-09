@@ -1,27 +1,9 @@
-[package]
-name = "pydrology"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+members = ["crates/pydrology-core", "crates/pydrology-macros", "crates/pydrology-python"]
+resolver = "3"
 
-[lib]
-name = "pydrology"
-crate-type = ["cdylib", "rlib"]
-
-[dependencies]
-pyo3 = { version = "0.23", features = ["extension-module"], optional = true }
-numpy = { version = "0.23", optional = true }
-
-[dev-dependencies]
-approx = "0.5"
-
-[features]
-default = []
-python = ["pyo3", "numpy"]
-
-[[bin]]
-name = "pydrology-demo"
-path = "src/main.rs"
-
-[[bin]]
-name = "bench"
-path = "src/bin/bench.rs"
+[workspace.dependencies]
+pydrology-core = { path = "crates/pydrology-core" }
+pydrology-macros = { path = "crates/pydrology-macros" }
+pyo3 = { version = "0.23", features = ["extension-module"] }
+numpy = "0.23"
