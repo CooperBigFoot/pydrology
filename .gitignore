@@ -16,3 +16,9 @@ Thumbs.db
 # test coverage files
 .coverage
 htmlcov/
+
+# Rust
+/target
+*.so
+*.dylib
+*.pyd
