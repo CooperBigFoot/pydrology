@@ -1,7 +1,7 @@
-"""Tests for GR2M Numba acceleration.
+"""Tests for GR2M Rust backend.
 
-Tests verify that Numba-compiled functions produce identical results
-to the pure Python implementations.
+Tests verify edge cases and numerical stability of the Rust-backed
+run() and step() functions.
 """
 
 import numpy as np
@@ -10,95 +10,10 @@ import pytest
 
 from pydrology import ForcingData, Resolution
 from pydrology.models.gr2m import Parameters, State, run, step
-from pydrology.models.gr2m.run import _run_numba, _step_numba
 
 
-class TestStepNumbaEquivalence:
-    """Tests that _step_numba produces same results as step()."""
-
-    @pytest.fixture
-    def params(self) -> Parameters:
-        return Parameters(x1=500, x2=1.0)
-
-    @pytest.fixture
-    def state(self, params: Parameters) -> State:
-        return State.initialize(params)
-
-    def test_single_step_equivalence(self, params: Parameters, state: State) -> None:
-        """Single step produces identical results in Numba and Python."""
-        precip, pet = 80.0, 30.0
-
-        # Python step
-        new_state_py, fluxes_py = step(state, params, precip, pet)
-
-        # Numba step
-        state_arr = np.asarray(state).copy()
-        params_arr = np.asarray(params)
-        output_arr = np.zeros(11)
-        _step_numba(state_arr, params_arr, precip, pet, output_arr)
-
-        # Compare outputs
-        assert output_arr[10] == pytest.approx(fluxes_py["streamflow"], rel=1e-10)
-        assert output_arr[2] == pytest.approx(fluxes_py["production_store"], rel=1e-10)
-        assert output_arr[8] == pytest.approx(fluxes_py["routing_store"], rel=1e-10)
-
-    def test_multiple_steps_state_evolution(self, params: Parameters, state: State) -> None:
-        """State evolves identically over multiple steps."""
-        # Numba path
-        state_arr = np.asarray(state).copy()
-        params_arr = np.asarray(params)
-        output_arr = np.zeros(11)
-
-        # Python path
-        state_py = State.initialize(params)
-
-        for i in range(12):
-            precip = 40.0 + i * 10
-            pet = 20.0 + i * 5
-
-            state_py, _ = step(state_py, params, precip, pet)
-            _step_numba(state_arr, params_arr, precip, pet, output_arr)
-
-        # Compare final states
-        assert state_arr[0] == pytest.approx(state_py.production_store, rel=1e-10)
-        assert state_arr[1] == pytest.approx(state_py.routing_store, rel=1e-10)
-
-    def test_step_all_output_fields(self, params: Parameters, state: State) -> None:
-        """All 11 output fields match between Numba and Python."""
-        precip, pet = 100.0, 40.0
-
-        # Python step
-        _, fluxes_py = step(state, params, precip, pet)
-
-        # Numba step
-        state_arr = np.asarray(state).copy()
-        params_arr = np.asarray(params)
-        output_arr = np.zeros(11)
-        _step_numba(state_arr, params_arr, precip, pet, output_arr)
-
-        # Map output array indices to flux keys
-        output_mapping = [
-            "pet",
-            "precip",
-            "production_store",
-            "rainfall_excess",
-            "storage_fill",
-            "actual_et",
-            "percolation",
-            "routing_input",
-            "routing_store",
-            "exchange",
-            "streamflow",
-        ]
-
-        for idx, key in enumerate(output_mapping):
-            assert output_arr[idx] == pytest.approx(fluxes_py[key], rel=1e-10), (
-                f"Field {key} (index {idx}) does not match"
-            )
-
-
-class TestRunNumbaEquivalence:
-    """Tests that _run_numba produces same results as the slow path."""
+class TestRunStepConsistency:
+    """Tests that run() and step() produce consistent results."""
 
     @pytest.fixture
     def params(self) -> Parameters:
@@ -115,15 +30,13 @@ class TestRunNumbaEquivalence:
             resolution=Resolution.monthly,
         )
 
-    def test_full_run_equivalence(self, params: Parameters, forcing: ForcingData) -> None:
-        """Full simulation produces identical streamflow."""
-        # Run via the normal API (uses Numba internally)
+    def test_full_run_matches_step_loop(self, params: Parameters, forcing: ForcingData) -> None:
+        """Full simulation via run() matches sequential step() calls."""
         result = run(params, forcing)
 
-        # Run manually with the slow Python path for comparison
         state = State.initialize(params)
 
-        streamflow_py = []
+        streamflow_step = []
         for i in range(len(forcing)):
             state, fluxes = step(
                 state,
@@ -131,18 +44,17 @@ class TestRunNumbaEquivalence:
                 float(forcing.precip[i]),
                 float(forcing.pet[i]),
             )
-            streamflow_py.append(fluxes["streamflow"])
+            streamflow_step.append(fluxes["streamflow"])
 
-        np.testing.assert_allclose(result.fluxes.streamflow, streamflow_py, rtol=1e-10)
+        np.testing.assert_allclose(result.fluxes.streamflow, streamflow_step, rtol=1e-10)
 
     def test_all_outputs_match(self, params: Parameters, forcing: ForcingData) -> None:
-        """All 11 GR2M output fields match between Numba and Python paths."""
+        """All 11 GR2M output fields match between run() and step() loop."""
         result = run(params, forcing)
 
         state = State.initialize(params)
 
-        # Collect all outputs from Python path
-        outputs_py: dict[str, list[float]] = {
+        outputs_step: dict[str, list[float]] = {
             k: []
             for k in [
                 "pet",
@@ -166,48 +78,16 @@ class TestRunNumbaEquivalence:
                 float(forcing.precip[i]),
                 float(forcing.pet[i]),
             )
-            for k in outputs_py:
-                outputs_py[k].append(fluxes[k])
+            for k in outputs_step:
+                outputs_step[k].append(fluxes[k])
 
-        # Compare all fields
-        for k in outputs_py:
+        for k in outputs_step:
             np.testing.assert_allclose(
                 getattr(result.fluxes, k),
-                outputs_py[k],
+                outputs_step[k],
                 rtol=1e-10,
                 err_msg=f"Field {k} does not match",
             )
-
-    def test_run_numba_direct(self, params: Parameters, forcing: ForcingData) -> None:
-        """Test _run_numba directly against Python path."""
-        state = State.initialize(params)
-
-        # Numba path
-        state_arr = np.asarray(state).copy()
-        params_arr = np.asarray(params)
-        outputs_arr = np.zeros((len(forcing), 11), dtype=np.float64)
-
-        _run_numba(
-            state_arr,
-            params_arr,
-            forcing.precip.astype(np.float64),
-            forcing.pet.astype(np.float64),
-            outputs_arr,
-        )
-
-        # Python path
-        state_py = State.initialize(params)
-        streamflow_py = []
-        for i in range(len(forcing)):
-            state_py, fluxes = step(
-                state_py,
-                params,
-                float(forcing.precip[i]),
-                float(forcing.pet[i]),
-            )
-            streamflow_py.append(fluxes["streamflow"])
-
-        np.testing.assert_allclose(outputs_arr[:, 10], streamflow_py, rtol=1e-10)
 
 
 class TestEdgeCases:

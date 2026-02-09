@@ -17,7 +17,7 @@ from .constants import (
     compute_state_size,
 )
 from .outputs import GR6JCemaNeigeFluxes
-from .run import _run_unified_numba, run, step
+from .run import run, step
 from .types import Parameters, State
 
 # STATE_SIZE for the default single-layer case (required by registry)
@@ -33,7 +33,6 @@ __all__ = [
     "STATE_SIZE_BASE",
     "SUPPORTED_RESOLUTIONS",
     "State",
-    "_run_unified_numba",
     "compute_state_size",
     "run",
     "step",

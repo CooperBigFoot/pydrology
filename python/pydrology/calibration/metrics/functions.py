@@ -1,10 +1,20 @@
 """Hydrological metrics for calibration objectives.
 
 All metrics take (observed, simulated) arrays and return a scalar score.
+Backed by Rust implementations via PyO3.
 """
 
 import numpy as np
 from numpy.typing import ArrayLike
+
+from pydrology._core.metrics import (
+    rust_kge,
+    rust_log_nse,
+    rust_mae,
+    rust_nse,
+    rust_pbias,
+    rust_rmse,
+)
 
 from .registry import register
 
@@ -17,13 +27,7 @@ def nse(observed: ArrayLike, simulated: ArrayLike) -> float:
 
     Range: (-inf, 1], where 1 is perfect match.
     """
-    obs = np.asarray(observed)
-    sim = np.asarray(simulated)
-    numerator = np.sum((obs - sim) ** 2)
-    denominator = np.sum((obs - np.mean(obs)) ** 2)
-    if denominator == 0:
-        return -np.inf
-    return float(1.0 - numerator / denominator)
+    return float(rust_nse(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)))
 
 
 @register("maximize")
@@ -35,14 +39,7 @@ def log_nse(observed: ArrayLike, simulated: ArrayLike) -> float:
 
     Range: (-inf, 1], where 1 is perfect match.
     """
-    obs = np.asarray(observed)
-    sim = np.asarray(simulated)
-
-    # Add small constant to avoid log(0)
-    log_obs = np.log(obs + 0.01)
-    log_sim = np.log(sim + 0.01)
-
-    return nse(log_obs, log_sim)
+    return float(rust_log_nse(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)))
 
 
 @register("maximize")
@@ -58,19 +55,7 @@ def kge(observed: ArrayLike, simulated: ArrayLike) -> float:
 
     Range: (-inf, 1], where 1 is perfect match.
     """
-    obs = np.asarray(observed)
-    sim = np.asarray(simulated)
-
-    # Correlation
-    r = 0.0 if np.std(obs) == 0 or np.std(sim) == 0 else float(np.corrcoef(obs, sim)[0, 1])
-
-    # Variability ratio
-    alpha = 0.0 if np.std(obs) == 0 else float(np.std(sim) / np.std(obs))
-
-    # Bias ratio
-    beta = 0.0 if np.mean(obs) == 0 else float(np.mean(sim) / np.mean(obs))
-
-    return float(1.0 - np.sqrt((r - 1) ** 2 + (alpha - 1) ** 2 + (beta - 1) ** 2))
+    return float(rust_kge(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)))
 
 
 @register("minimize")
@@ -82,11 +67,7 @@ def pbias(observed: ArrayLike, simulated: ArrayLike) -> float:
     Positive PBIAS = overestimation, negative = underestimation.
     Optimal value is 0.
     """
-    obs = np.asarray(observed)
-    sim = np.asarray(simulated)
-    if np.sum(obs) == 0:
-        return np.inf
-    return float(100.0 * np.sum(sim - obs) / np.sum(obs))
+    return float(rust_pbias(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)))
 
 
 @register("minimize")
@@ -97,9 +78,7 @@ def rmse(observed: ArrayLike, simulated: ArrayLike) -> float:
 
     Range: [0, inf), where 0 is perfect match.
     """
-    obs = np.asarray(observed)
-    sim = np.asarray(simulated)
-    return float(np.sqrt(np.mean((obs - sim) ** 2)))
+    return float(rust_rmse(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)))
 
 
 @register("minimize")
@@ -110,6 +89,4 @@ def mae(observed: ArrayLike, simulated: ArrayLike) -> float:
 
     Range: [0, inf), where 0 is perfect match.
     """
-    obs = np.asarray(observed)
-    sim = np.asarray(simulated)
-    return float(np.mean(np.abs(obs - sim)))
+    return float(rust_mae(np.ascontiguousarray(observed, dtype=np.float64), np.ascontiguousarray(simulated, dtype=np.float64)))
