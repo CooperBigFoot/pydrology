@@ -51,8 +51,7 @@ fn gr2m_run<'py>(
     initial_state: Option<PyReadonlyArray1<'py, f64>>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let p_slice = checked_slice(&params, 2, "params")?;
-    let p = Parameters::new(p_slice[0], p_slice[1])
-        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let p = Parameters::new(p_slice[0], p_slice[1]);
 
     let precip_slice = contiguous_slice(&precip)?;
     let pet_slice = contiguous_slice(&pet)?;
@@ -97,8 +96,7 @@ fn gr2m_step<'py>(
     pet: f64,
 ) -> PyResult<(Bound<'py, PyArray1<f64>>, Bound<'py, PyDict>)> {
     let p_slice = checked_slice(&params, 2, "params")?;
-    let p = Parameters::new(p_slice[0], p_slice[1])
-        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let p = Parameters::new(p_slice[0], p_slice[1]);
 
     let s_slice = checked_slice(&state, 2, "state")?;
     let s = State {

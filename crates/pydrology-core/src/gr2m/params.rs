@@ -5,7 +5,7 @@
 ///
 /// - `x1`: Production store capacity [mm]
 /// - `x2`: Groundwater exchange coefficient [-]
-use super::constants::{PARAM_BOUNDS, PARAM_NAMES, X1_BOUNDS, X2_BOUNDS};
+use super::constants::{PARAM_BOUNDS, PARAM_NAMES};
 use crate::traits::ModelParams;
 
 #[derive(Debug, Clone, Copy)]
@@ -15,21 +15,9 @@ pub struct Parameters {
 }
 
 impl Parameters {
-    /// Create new Parameters, returning an error if out of bounds.
-    pub fn new(x1: f64, x2: f64) -> Result<Self, String> {
-        if !(X1_BOUNDS.min..=X1_BOUNDS.max).contains(&x1) {
-            return Err(format!(
-                "x1 = {} is out of bounds [{}, {}]",
-                x1, X1_BOUNDS.min, X1_BOUNDS.max
-            ));
-        }
-        if !(X2_BOUNDS.min..=X2_BOUNDS.max).contains(&x2) {
-            return Err(format!(
-                "x2 = {} is out of bounds [{}, {}]",
-                x2, X2_BOUNDS.min, X2_BOUNDS.max
-            ));
-        }
-        Ok(Self { x1, x2 })
+    /// Create new Parameters.
+    pub fn new(x1: f64, x2: f64) -> Self {
+        Self { x1, x2 }
     }
 }
 
@@ -46,7 +34,7 @@ impl ModelParams for Parameters {
                 arr.len()
             ));
         }
-        Self::new(arr[0], arr[1])
+        Ok(Self::new(arr[0], arr[1]))
     }
 
     fn to_array(&self) -> Vec<f64> {
@@ -60,35 +48,15 @@ mod tests {
 
     #[test]
     fn valid_parameters() {
-        let p = Parameters::new(500.0, 1.0).unwrap();
+        let p = Parameters::new(500.0, 1.0);
         assert_eq!(p.x1, 500.0);
         assert_eq!(p.x2, 1.0);
     }
 
     #[test]
-    fn x1_too_low() {
-        assert!(Parameters::new(0.5, 1.0).is_err());
-    }
-
-    #[test]
-    fn x1_too_high() {
-        assert!(Parameters::new(3000.0, 1.0).is_err());
-    }
-
-    #[test]
-    fn x2_too_low() {
-        assert!(Parameters::new(500.0, 0.1).is_err());
-    }
-
-    #[test]
-    fn x2_too_high() {
-        assert!(Parameters::new(500.0, 3.0).is_err());
-    }
-
-    #[test]
     fn boundary_values_are_valid() {
-        assert!(Parameters::new(1.0, 0.2).is_ok());
-        assert!(Parameters::new(2500.0, 2.0).is_ok());
+        let _ = Parameters::new(1.0, 0.2);
+        let _ = Parameters::new(2500.0, 2.0);
     }
 
     use crate::traits::ModelParams;
@@ -108,7 +76,7 @@ mod tests {
 
     #[test]
     fn to_array_roundtrip() {
-        let p = Parameters::new(500.0, 1.0).unwrap();
+        let p = Parameters::new(500.0, 1.0);
         let arr = p.to_array();
         let p2 = Parameters::from_array(&arr).unwrap();
         assert_eq!(p.x1, p2.x1);

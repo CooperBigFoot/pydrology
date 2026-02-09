@@ -220,7 +220,7 @@ mod tests {
     use super::*;
 
     fn test_params() -> Parameters {
-        Parameters::new(350.0, 0.0, 90.0, 1.7, 0.0, 5.0).unwrap()
+        Parameters::new(350.0, 0.0, 90.0, 1.7, 0.0, 5.0)
     }
 
     // -- step() tests --
@@ -386,7 +386,7 @@ mod tests {
     #[test]
     fn actual_exchange_total_with_nonzero_exchange() {
         // Use x2 != 0 to get non-zero exchange
-        let p = Parameters::new(350.0, 1.5, 90.0, 1.7, 0.5, 5.0).unwrap();
+        let p = Parameters::new(350.0, 1.5, 90.0, 1.7, 0.5, 5.0);
         let s = State::initialize(&p);
         let (uh1, uh2) = compute_uh_ordinates(p.x4);
 

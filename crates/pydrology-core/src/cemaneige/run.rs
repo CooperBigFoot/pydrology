@@ -175,7 +175,7 @@ mod tests {
     use super::*;
 
     fn test_params() -> Parameters {
-        Parameters::new(0.97, 2.5).unwrap()
+        Parameters::new(0.97, 2.5)
     }
 
     // -- step() tests --

@@ -102,12 +102,9 @@ fn gr6j_cemaneige_run<'py>(
 
     let gr6j_params = GR6JParameters::new(
         p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5],
-    ).map_err(pyo3::exceptions::PyValueError::new_err)?;
+    );
     let ctg = p_slice[6];
     let kf = p_slice[7];
-    // Validate CemaNeige params
-    use pydrology_core::cemaneige::params::Parameters as CemaNeigeParameters;
-    let _ = CemaNeigeParameters::new(ctg, kf).map_err(pyo3::exceptions::PyValueError::new_err)?;
 
     let precip_slice = contiguous_slice(&precip)?;
     let pet_slice = contiguous_slice(&pet)?;
@@ -325,11 +322,9 @@ fn gr6j_cemaneige_step<'py>(
 
     let gr6j_params = GR6JParameters::new(
         p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5],
-    ).map_err(pyo3::exceptions::PyValueError::new_err)?;
+    );
     let ctg = p_slice[6];
     let kf = p_slice[7];
-    use pydrology_core::cemaneige::params::Parameters as CemaNeigeParameters;
-    let _ = CemaNeigeParameters::new(ctg, kf).map_err(pyo3::exceptions::PyValueError::new_err)?;
 
     let elevs = contiguous_slice(&layer_elevations)?;
     let fracs = contiguous_slice(&layer_fractions)?;

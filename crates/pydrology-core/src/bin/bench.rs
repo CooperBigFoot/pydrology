@@ -45,7 +45,7 @@ fn median_time<F: FnMut()>(mut f: F) -> Duration {
 }
 
 fn bench_gr2m(sizes: &[usize]) -> Vec<(&'static str, usize, Duration)> {
-    let params = GR2MParameters::new(500.0, 1.0).unwrap();
+    let params = GR2MParameters::new(500.0, 1.0);
     let mut results = Vec::new();
 
     for &n in sizes {
@@ -63,7 +63,7 @@ fn bench_gr2m(sizes: &[usize]) -> Vec<(&'static str, usize, Duration)> {
 }
 
 fn bench_gr6j(sizes: &[usize]) -> Vec<(&'static str, usize, Duration)> {
-    let params = GR6JParameters::new(350.0, 0.0, 90.0, 1.7, 0.0, 5.0).unwrap();
+    let params = GR6JParameters::new(350.0, 0.0, 90.0, 1.7, 0.0, 5.0);
     let mut results = Vec::new();
 
     for &n in sizes {
@@ -106,7 +106,7 @@ fn bench_hbv(sizes: &[usize]) -> Vec<(&'static str, usize, Duration)> {
 }
 
 fn bench_cemaneige(sizes: &[usize]) -> Vec<(&'static str, usize, Duration)> {
-    let gr6j_params = GR6JParameters::new(350.0, 0.0, 90.0, 1.7, 0.0, 5.0).unwrap();
+    let gr6j_params = GR6JParameters::new(350.0, 0.0, 90.0, 1.7, 0.0, 5.0);
     let ctg = 0.97;
     let kf = 2.5;
     let layer_elevations = vec![0.0];

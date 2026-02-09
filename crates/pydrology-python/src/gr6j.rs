@@ -57,8 +57,7 @@ fn gr6j_run<'py>(
     initial_state: Option<PyReadonlyArray1<'py, f64>>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let p_slice = checked_slice(&params, 6, "params")?;
-    let p = Parameters::new(p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5])
-        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let p = Parameters::new(p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5]);
 
     let precip_slice = contiguous_slice(&precip)?;
     let pet_slice = contiguous_slice(&pet)?;
@@ -108,8 +107,7 @@ fn gr6j_step<'py>(
     uh2_ordinates: PyReadonlyArray1<'py, f64>,
 ) -> PyResult<(Bound<'py, PyArray1<f64>>, Bound<'py, PyDict>)> {
     let p_slice = checked_slice(&params, 6, "params")?;
-    let p = Parameters::new(p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5])
-        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let p = Parameters::new(p_slice[0], p_slice[1], p_slice[2], p_slice[3], p_slice[4], p_slice[5]);
 
     let s_slice = checked_slice(&state, 63, "state")?;
     let mut state_arr = [0.0f64; 63];

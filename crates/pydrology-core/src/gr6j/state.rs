@@ -95,7 +95,7 @@ mod tests {
     use super::*;
 
     fn test_params() -> Parameters {
-        Parameters::new(350.0, 0.0, 90.0, 1.7, 0.0, 5.0).unwrap()
+        Parameters::new(350.0, 0.0, 90.0, 1.7, 0.0, 5.0)
     }
 
     #[test]

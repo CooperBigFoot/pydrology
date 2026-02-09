@@ -2,7 +2,7 @@ use pydrology_core::gr2m::params::Parameters;
 use pydrology_core::gr2m::run;
 
 fn main() {
-    let p = Parameters::new(500.0, 1.0).unwrap();
+    let p = Parameters::new(500.0, 1.0);
 
     // 12 months of forcing data (mm/month)
     let precip = [

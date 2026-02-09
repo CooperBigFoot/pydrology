@@ -1,7 +1,7 @@
 /// HBV-Light calibrated parameters.
 ///
 /// 14 parameters that define model behavior.
-use super::constants::{ALL_BOUNDS, N_PARAMS, PARAM_BOUNDS, PARAM_NAMES};
+use super::constants::{MAXBAS_BOUNDS, N_PARAMS, PARAM_BOUNDS, PARAM_NAMES};
 use crate::traits::ModelParams;
 
 #[derive(Debug, Clone, Copy)]
@@ -23,7 +23,7 @@ pub struct Parameters {
 }
 
 impl Parameters {
-    /// Create new Parameters, returning an error if any value is out of bounds.
+    /// Create new Parameters, returning an error if maxbas is out of its structural bounds.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         tt: f64,
@@ -41,17 +41,11 @@ impl Parameters {
         uzl: f64,
         maxbas: f64,
     ) -> Result<Self, String> {
-        let values = [
-            tt, cfmax, sfcf, cwh, cfr, fc, lp, beta, k0, k1, k2, perc, uzl, maxbas,
-        ];
-        for (i, &val) in values.iter().enumerate() {
-            let bounds = ALL_BOUNDS[i];
-            if !(bounds.min..=bounds.max).contains(&val) {
-                return Err(format!(
-                    "{} = {} is out of bounds [{}, {}]",
-                    PARAM_NAMES[i], val, bounds.min, bounds.max
-                ));
-            }
+        if !(MAXBAS_BOUNDS.min..=MAXBAS_BOUNDS.max).contains(&maxbas) {
+            return Err(format!(
+                "maxbas = {} is out of bounds [{}, {}] (structural: routing buffer size)",
+                maxbas, MAXBAS_BOUNDS.min, MAXBAS_BOUNDS.max
+            ));
         }
         Ok(Self {
             tt,
@@ -151,22 +145,6 @@ mod tests {
     #[test]
     fn from_array_wrong_length() {
         assert!(Parameters::from_array(&[1.0, 2.0]).is_err());
-    }
-
-    #[test]
-    fn tt_out_of_bounds() {
-        assert!(Parameters::new(
-            -3.0, 3.0, 1.0, 0.1, 0.05, 250.0, 0.9, 2.0, 0.4, 0.1, 0.01, 1.0, 20.0, 2.5
-        )
-        .is_err());
-    }
-
-    #[test]
-    fn fc_out_of_bounds() {
-        assert!(Parameters::new(
-            0.0, 3.0, 1.0, 0.1, 0.05, 10.0, 0.9, 2.0, 0.4, 0.1, 0.01, 1.0, 20.0, 2.5
-        )
-        .is_err());
     }
 
     #[test]

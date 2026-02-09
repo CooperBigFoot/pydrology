@@ -342,7 +342,7 @@ mod tests {
     use crate::cemaneige::constants::GTHRESHOLD_FACTOR;
 
     fn test_gr6j_params() -> GR6JParameters {
-        GR6JParameters::new(350.0, 0.0, 90.0, 1.7, 0.0, 5.0).unwrap()
+        GR6JParameters::new(350.0, 0.0, 90.0, 1.7, 0.0, 5.0)
     }
 
     fn test_snow_states(n_layers: usize, masp: f64) -> Vec<[f64; LAYER_STATE_SIZE]> {
