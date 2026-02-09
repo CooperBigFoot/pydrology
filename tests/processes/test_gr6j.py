@@ -6,7 +6,7 @@ according to MODEL_DEFINITION.md equations.
 
 import numpy as np
 
-from pydrology.models.gr6j.processes import (
+from pydrology.processes.gr6j import (
     direct_branch,
     exponential_store_update,
     groundwater_exchange,

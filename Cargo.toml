@@ -1,0 +1,9 @@
+[workspace]
+members = ["crates/pydrology-core", "crates/pydrology-macros", "crates/pydrology-python"]
+resolver = "3"
+
+[workspace.dependencies]
+pydrology-core = { path = "crates/pydrology-core" }
+pydrology-macros = { path = "crates/pydrology-macros" }
+pyo3 = { version = "0.23", features = ["extension-module"] }
+numpy = "0.23"

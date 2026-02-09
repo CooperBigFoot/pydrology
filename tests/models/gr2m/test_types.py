@@ -7,7 +7,7 @@ for the core data structures used throughout the model.
 import numpy as np
 import pytest
 
-from pydrology.models.gr2m.types import Parameters, State
+from pydrology.models.gr2m import Parameters, State
 
 
 class TestParameters:

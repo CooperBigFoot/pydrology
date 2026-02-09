@@ -7,7 +7,7 @@ according to AIRGR_MODEL_DEFINITION.md equations.
 import numpy as np
 import pytest
 
-from pydrology.models.gr2m.processes import (
+from pydrology.processes.gr2m import (
     compute_streamflow,
     percolation,
     production_store_evaporation,

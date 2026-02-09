@@ -1,0 +1,5 @@
+error: Fluxes derive: all fields must be f64
+ --> tests/fail/non_f64_field.rs:6:16
+  |
+6 |     pub count: u32,
+  |                ^^^

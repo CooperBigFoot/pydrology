@@ -10,7 +10,7 @@ import pytest
 
 from pydrology import Catchment, ForcingData, SnowLayerOutputs
 from pydrology.models.gr6j_cemaneige import Parameters, State, run, step
-from pydrology.models.gr6j.unit_hydrographs import compute_uh_ordinates
+from pydrology.processes.unit_hydrographs import compute_uh_ordinates
 from pydrology.outputs import ModelOutput
 
 
