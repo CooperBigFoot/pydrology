@@ -1,6 +1,6 @@
 # PyDrology
 
-Lumped conceptual rainfall-runoff modeling at daily timesteps.
+Lumped conceptual rainfall-runoff modeling at daily timesteps, powered by a compiled Rust core.
 
 ## Maintenance Status
 
@@ -9,13 +9,26 @@ This repository is part of an ongoing project and actively maintained.
 
 **Topic:** `python-package`
 
+## Architecture
+
+```
+Python API  →  PyO3 bindings  →  Rust core
+(pydrology)    (pydrology._core)  (pydrology-core)
+```
+
+All numerical model code (GR2M, GR6J, HBV-Light, CemaNeige) runs in compiled Rust. The Python layer provides parameter/state dataclasses, forcing data handling, calibration, and result formatting. PyO3/maturin bridges the two at the numpy array level.
+
 ## Installation
+
+**Prerequisites:** Python ≥ 3.12, [uv](https://docs.astral.sh/uv/), and a [Rust toolchain](https://rustup.rs/) (for building the native extension).
 
 ```bash
 git clone https://github.com/CooperBigFoot/pydrology.git
 cd pydrology
-uv sync
+uv sync            # install Python deps + build Rust extension via maturin
 ```
+
+The first build compiles the Rust core and may take 1-2 minutes. Subsequent builds are incremental and much faster.
 
 ## Quick Start
 
@@ -111,10 +124,20 @@ output = model.run(params, forcing, catchment)
 
 ## Documentation
 
+- [Architecture](docs/ARCHITECTURE.md) — Three-layer design, trait system, adding new models
 - [User Guide](docs/USER_GUIDE.md) — Custom states, multi-layer elevation bands, advanced usage
 - [GR2M Model](docs/GR2M.md) — Monthly model with 2 parameters
 - [GR6J Model](docs/GR6J.md) — Parameter details and equations
 - [HBV-light Model](docs/HBV_LIGHT.md) — Parameter details and structure
+
+## Development
+
+```bash
+uv run maturin develop --release   # rebuild Rust extension (release mode)
+cargo test --workspace             # run Rust unit tests
+uv run python -m pytest            # run Python test suite
+uv run ruff format && uv run ruff check --fix  # format + lint
+```
 
 ## References
 

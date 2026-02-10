@@ -2,6 +2,7 @@
 
 Public API for the GR2M hydrological model. Combines constants, types,
 outputs, and run/step functions into a single module.
+Core computations are executed in Rust via PyO3.
 """
 
 from __future__ import annotations
@@ -204,10 +205,17 @@ def step(
         Tuple of (new_state, fluxes) where:
         - new_state: Updated State object after the timestep
         - fluxes: Dictionary containing all model outputs
+
+    Delegates to the compiled Rust backend for a single timestep.
     """
     from pydrology._core import gr2m as _rust
 
-    new_state_arr, fluxes = _rust.gr2m_step(np.asarray(state), np.asarray(params), precip, pet)
+    new_state_arr, fluxes = _rust.gr2m_step(
+        np.ascontiguousarray(state, dtype=np.float64),
+        np.ascontiguousarray(params, dtype=np.float64),
+        precip,
+        pet,
+    )
 
     new_state = State.from_array(new_state_arr)
     fluxes_converted: dict[str, float] = {k: float(v) for k, v in fluxes.items()}
@@ -236,6 +244,8 @@ def run(
 
     Raises:
         ValueError: If forcing resolution is not monthly.
+
+    Delegates to the compiled Rust backend for the full simulation loop.
     """
     if forcing.resolution not in SUPPORTED_RESOLUTIONS:
         supported = [r.value for r in SUPPORTED_RESOLUTIONS]
@@ -245,10 +255,10 @@ def run(
     from pydrology._core import gr2m as _rust
     from pydrology.outputs import ModelOutput
 
-    state_arr = np.asarray(initial_state) if initial_state is not None else None
+    state_arr = np.ascontiguousarray(initial_state, dtype=np.float64) if initial_state is not None else None
 
     result = _rust.gr2m_run(
-        np.asarray(params),
+        np.ascontiguousarray(params, dtype=np.float64),
         forcing.precip.astype(np.float64),
         forcing.pet.astype(np.float64),
         state_arr,

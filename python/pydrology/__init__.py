@@ -1,7 +1,7 @@
 """PyDrology hydrological modeling package.
 
-A collection of lumped conceptual rainfall-runoff models for daily streamflow simulation.
-Includes GR6J (Génie Rural à 6 paramètres Journalier) and optional CemaNeige snow module.
+Lumped conceptual rainfall-runoff models (GR2M, GR6J, HBV-Light, CemaNeige) for
+streamflow simulation and calibration. Core computations are executed in Rust via PyO3.
 """
 
 import pydrology.models.gr2m  # noqa: F401 - triggers auto-registration

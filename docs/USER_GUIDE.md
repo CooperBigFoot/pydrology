@@ -1779,41 +1779,40 @@ fraction = compute_solid_fraction(temp, t_snow=-1.0, t_rain=3.0)
 
 ## Performance Notes
 
-The pydrology implementation uses [Numba](https://numba.pydata.org/) for just-in-time (JIT) compilation of the core model functions. This provides significant performance improvements over pure Python.
+The pydrology core is written in Rust and compiled ahead-of-time via [PyO3](https://pyo3.rs/) and [maturin](https://www.maturin.rs/). All model computations (GR2M, GR6J, HBV-Light, CemaNeige) execute as native machine code with no runtime compilation overhead.
 
-### JIT Compilation Overhead
+### No Compilation Overhead
 
-The first time you run the model, Numba compiles the core functions to machine code. This initial compilation takes a few seconds but only happens once per Python session:
+Unlike JIT-based approaches, the Rust core is compiled ahead-of-time when the package is installed. Every call to `run()` or `step()` executes at full native speed from the first invocation:
 
 ```python
-# First run: includes JIT compilation overhead (~1-2 seconds)
+# First run: no warm-up penalty, immediate native speed
 output1 = run(params, forcing)
 
-# Subsequent runs: compiled code is reused (very fast)
-output2 = run(params, forcing2)  # ~10-50x faster
+# All subsequent runs: identical performance
+output2 = run(params, forcing2)
 ```
-
-Compiled code is cached to disk (`__pycache__`), so future Python sessions benefit from pre-compiled code after the first run.
 
 ### Expected Performance
 
-On typical hardware, the Numba-accelerated implementation achieves:
+On typical hardware, the compiled Rust core achieves:
 
-| Mode | Performance |
-|------|-------------|
-| GR6J only | ~5-7 million timesteps/second |
-| GR6J + single-layer snow | ~3-5 million timesteps/second |
-| GR6J + multi-layer snow (5 layers) | ~1-2 million timesteps/second |
+| Model | ~100-year daily (36,500 steps) |
+|-------|-------------------------------|
+| GR2M (monthly) | < 1 ms |
+| GR6J | ~ 5 ms |
+| HBV-Light (single zone) | ~ 3 ms |
+| GR6J-CemaNeige (single layer) | ~ 12 ms |
 
-This means a 30-year daily simulation (10,950 timesteps) completes in approximately 1-5 milliseconds.
+A 30-year daily simulation (10,950 timesteps) completes in approximately 1-5 milliseconds for most models.
 
 ### No User Action Required
 
-The acceleration is transparent - you don't need to change your code to benefit from it. Simply call `run()` as documented and the optimized implementation is used automatically.
+The acceleration is transparent — you don't need to change your code to benefit from it. Simply call `run()` as documented and the native Rust implementation is used automatically.
 
 ### Calibration Performance
 
-During calibration, the model runs thousands of times per optimization. The Numba acceleration provides substantial speedups:
+During calibration, the model runs thousands of times per optimization. The compiled Rust core keeps each evaluation fast:
 
 - **Single-objective calibration** (100 generations, 50 individuals): Typically completes in seconds to minutes depending on forcing data length
 - **Multi-objective calibration**: Similar performance, with Pareto front evaluation adding minimal overhead

@@ -21,18 +21,12 @@ Every model module must export the following:
 | `run` | `function` | Execute model over a timeseries |
 | `step` | `function` | Execute a single timestep |
 
-### Optional Exports
-
-| Export | Type | Default | Description |
-|--------|------|---------|-------------|
-| `HAS_NUMBA` | `bool` | `True` | Whether Numba-optimized kernels are available |
-
 ## Parameters Class Requirements
 
 The `Parameters` class must be a frozen dataclass with:
 
 1. **`from_array(arr: np.ndarray) -> Parameters`**: Class method to reconstruct from array
-2. **`__array__(dtype=None) -> np.ndarray`**: Convert to 1D array for Numba
+2. **`__array__(dtype=None) -> np.ndarray`**: Convert to 1D numpy array (enables `np.asarray(params)` for calibration and the Rust/PyO3 boundary)
 
 **Example:**
 
@@ -64,7 +58,7 @@ class Parameters:
 The `State` class must be a mutable dataclass with:
 
 1. **`from_array(arr: np.ndarray) -> State`**: Class method to reconstruct from array
-2. **`__array__(dtype=None) -> np.ndarray`**: Convert to 1D array for Numba
+2. **`__array__(dtype=None) -> np.ndarray`**: Convert to 1D numpy array (enables `np.asarray(state)` for calibration and the Rust/PyO3 boundary)
 3. **`initialize(params: Parameters) -> State`**: (Optional) Class method for default initialization
 
 **Example:**
@@ -120,7 +114,7 @@ def run(
 
 1. Must accept `params`, `forcing`, and optional `initial_state`
 2. Must return a `ModelOutput` compatible object
-3. Should use Numba-optimized kernels when available
+3. Should delegate computation to the Rust core via `pydrology._core`
 4. Should handle state initialization if `initial_state` is None
 
 ## Step Function Requirements

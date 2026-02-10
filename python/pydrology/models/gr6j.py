@@ -2,6 +2,7 @@
 
 Public API for the GR6J hydrological model. Combines constants, types,
 outputs, and run/step functions into a single module.
+Core computations are executed in Rust via PyO3.
 """
 
 from __future__ import annotations
@@ -273,11 +274,13 @@ def step(
         Tuple of (new_state, fluxes) where:
         - new_state: Updated State object after the timestep
         - fluxes: Dictionary containing all model outputs
+
+    Delegates to the compiled Rust backend for a single timestep.
     """
     from pydrology._core import gr6j as _rust
 
-    state_arr = np.asarray(state, dtype=np.float64)
-    params_arr = np.asarray(params, dtype=np.float64)
+    state_arr = np.ascontiguousarray(state, dtype=np.float64)
+    params_arr = np.ascontiguousarray(params, dtype=np.float64)
 
     new_state_arr, fluxes_dict = _rust.gr6j_step(
         state_arr,
@@ -310,6 +313,8 @@ def run(
 
     Returns:
         ModelOutput containing GR6J flux outputs.
+
+    Delegates to the compiled Rust backend for the full simulation loop.
     """
     if forcing.resolution not in SUPPORTED_RESOLUTIONS:
         supported = [r.value for r in SUPPORTED_RESOLUTIONS]
@@ -319,11 +324,11 @@ def run(
     from pydrology._core import gr6j as _rust
     from pydrology.outputs import ModelOutput
 
-    params_arr = np.asarray(params, dtype=np.float64)
+    params_arr = np.ascontiguousarray(params, dtype=np.float64)
 
     initial_state_arr = None
     if initial_state is not None:
-        initial_state_arr = np.asarray(initial_state, dtype=np.float64)
+        initial_state_arr = np.ascontiguousarray(initial_state, dtype=np.float64)
 
     result = _rust.gr6j_run(
         params_arr,

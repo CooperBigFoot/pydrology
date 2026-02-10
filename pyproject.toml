@@ -1,9 +1,19 @@
 [project]
 name = "pydrology"
 version = "0.1.0"
-description = "Add your description here"
+description = "Lumped conceptual rainfall-runoff models (GR2M, GR6J, HBV-Light, CemaNeige) with a compiled Rust core"
 readme = "README.md"
 requires-python = ">=3.12"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Hydrology",
+]
+keywords = ["hydrology", "rainfall-runoff", "GR6J", "GR2M", "HBV", "CemaNeige", "simulation", "calibration"]
 dependencies = [
     "ctrl-freak",
     "geopandas>=1.1.2",
@@ -19,6 +29,11 @@ dependencies = [
     "tqdm>=4.66",
 ]
 
+
+[project.urls]
+Repository = "https://github.com/CooperBigFoot/pydrology"
+Documentation = "https://github.com/CooperBigFoot/pydrology/tree/main/docs"
+Issues = "https://github.com/CooperBigFoot/pydrology/issues"
 
 [build-system]
 requires = ["maturin>=1.7,<2"]

@@ -2,6 +2,7 @@
 
 Public API for the HBV-light hydrological model. Combines constants, types,
 outputs, routing, and run/step functions into a single module.
+Core computations are executed in Rust via PyO3.
 """
 
 from __future__ import annotations
@@ -474,14 +475,16 @@ def step(
         Tuple of (new_state, fluxes) where:
         - new_state: Updated State object after the timestep
         - fluxes: Dictionary containing all model outputs (area-weighted aggregates)
+
+    Delegates to the compiled Rust backend for a single timestep.
     """
     from pydrology._core import hbv_light as _rust
 
     if uh_weights is None:
         uh_weights = compute_triangular_weights(params.maxbas)
 
-    state_arr = np.asarray(state, dtype=np.float64)
-    params_arr = np.asarray(params, dtype=np.float64)
+    state_arr = np.ascontiguousarray(state, dtype=np.float64)
+    params_arr = np.ascontiguousarray(params, dtype=np.float64)
 
     new_state_arr, fluxes = _rust.hbv_step(
         state_arr,
@@ -517,6 +520,8 @@ def run(
 
     Raises:
         ValueError: If forcing.temp is None.
+
+    Delegates to the compiled Rust backend for the full simulation loop.
     """
     from pydrology._core import hbv_light as _rust
     from pydrology.outputs import ModelOutput
@@ -550,7 +555,7 @@ def run(
         precip_gradient = None
 
     # Prepare arrays
-    params_arr = np.asarray(params, dtype=np.float64)
+    params_arr = np.ascontiguousarray(params, dtype=np.float64)
     precip_arr = np.ascontiguousarray(forcing.precip, dtype=np.float64)
     pet_arr = np.ascontiguousarray(forcing.pet, dtype=np.float64)
     temp_arr = np.ascontiguousarray(forcing.temp, dtype=np.float64)
@@ -558,7 +563,7 @@ def run(
     # Initial state
     state_arr = None
     if initial_state is not None:
-        state_arr = np.asarray(initial_state, dtype=np.float64)
+        state_arr = np.ascontiguousarray(initial_state, dtype=np.float64)
 
     # Call Rust backend (returns a single merged dict)
     result = _rust.hbv_run(

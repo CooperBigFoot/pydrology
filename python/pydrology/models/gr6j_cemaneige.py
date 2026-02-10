@@ -3,6 +3,7 @@
 Public API for the coupled GR6J hydrological model with CemaNeige snow module.
 Provides an 8-parameter model combining rainfall-runoff (GR6J) with snow
 accumulation and melt (CemaNeige).
+Core computations are executed in Rust via PyO3.
 
 Design: Unified multi-layer code path. If catchment.input_elevation is None,
 extrapolation is skipped (single-layer behavior). One code path handles all cases.
@@ -386,6 +387,8 @@ def step(
 
     Returns:
         Tuple of (new_state, fluxes) where fluxes contains all snow and GR6J outputs.
+
+    Delegates to the compiled Rust backend for a single timestep.
     """
     from pydrology._core import cemaneige as _rust
 
@@ -398,8 +401,8 @@ def step(
         layer_fractions = np.ones(n_layers) / n_layers
 
     # Convert state and params to arrays
-    state_arr = np.ascontiguousarray(np.asarray(state), dtype=np.float64)
-    params_arr = np.ascontiguousarray(np.asarray(params), dtype=np.float64)
+    state_arr = np.ascontiguousarray(state, dtype=np.float64)
+    params_arr = np.ascontiguousarray(params, dtype=np.float64)
 
     new_state_arr, fluxes_dict = _rust.gr6j_cemaneige_step(
         state_arr,
@@ -450,6 +453,8 @@ def run(
 
     Raises:
         ValueError: If forcing.temp is None (temperature required for snow module).
+
+    Delegates to the compiled Rust backend for the full simulation loop.
     """
     from pydrology._core import cemaneige as _rust
     from pydrology.models.cemaneige.outputs import SnowLayerOutputs, SnowOutput
@@ -497,8 +502,8 @@ def run(
     input_elevation = catchment.input_elevation if catchment.input_elevation is not None else float("nan")
 
     # Convert to arrays
-    initial_state_arr = np.ascontiguousarray(np.asarray(state), dtype=np.float64)
-    params_arr = np.ascontiguousarray(np.asarray(params), dtype=np.float64)
+    initial_state_arr = np.ascontiguousarray(state, dtype=np.float64)
+    params_arr = np.ascontiguousarray(params, dtype=np.float64)
 
     # Call Rust backend (returns a single merged dict)
     result = _rust.gr6j_cemaneige_run(
