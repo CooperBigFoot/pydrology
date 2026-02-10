@@ -230,6 +230,11 @@ Generic wrapper in `pydrology/outputs.py`. `F` is the model-specific fluxes data
 
 ## Adding a New Model
 
+> **Detailed contributor guides:**
+> - Full tutorial with code templates: [`docs/ADDING_A_MODEL.md`](ADDING_A_MODEL.md)
+> - Step-by-step checklist: [`docs/MODEL_CHECKLIST.md`](MODEL_CHECKLIST.md)
+> - Common mistakes and fixes: [`docs/COMMON_MISTAKES.md`](COMMON_MISTAKES.md)
+
 ### 1. Rust Core (`crates/pydrology-core/src/<model>/`)
 
 Create the following files:
