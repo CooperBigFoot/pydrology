@@ -55,45 +55,43 @@ impl FluxesTimeseriesOps<Fluxes> for FluxesTimeseries {
 
 /// Per-zone outputs for multi-zone runs.
 ///
-/// 2D vectors: outer index is timestep, inner index is zone.
+/// Flat vectors: index = t * n_zones + zone_idx (row-major).
 #[derive(Debug)]
 pub struct ZoneOutputs {
     pub zone_elevations: Vec<f64>,
     pub zone_fractions: Vec<f64>,
-    /// zone_temp[timestep][zone]
-    pub zone_temp: Vec<Vec<f64>>,
-    pub zone_precip: Vec<Vec<f64>>,
-    pub snow_pack: Vec<Vec<f64>>,
-    pub liquid_water_in_snow: Vec<Vec<f64>>,
-    pub snow_melt: Vec<Vec<f64>>,
-    pub snow_input: Vec<Vec<f64>>,
-    pub soil_moisture: Vec<Vec<f64>>,
-    pub recharge: Vec<Vec<f64>>,
-    pub actual_et: Vec<Vec<f64>>,
+    pub n_timesteps: usize,
+    pub n_zones: usize,
+    /// zone_temp[t * n_zones + zone_idx]
+    pub zone_temp: Vec<f64>,
+    pub zone_precip: Vec<f64>,
+    pub snow_pack: Vec<f64>,
+    pub liquid_water_in_snow: Vec<f64>,
+    pub snow_melt: Vec<f64>,
+    pub snow_input: Vec<f64>,
+    pub soil_moisture: Vec<f64>,
+    pub recharge: Vec<f64>,
+    pub actual_et: Vec<f64>,
 }
 
 impl ZoneOutputs {
     /// Pre-allocate for `n_timesteps` timesteps and `n_zones` zones.
     pub fn with_capacity(n_timesteps: usize, n_zones: usize) -> Self {
-        let alloc_2d = || {
-            let mut outer = Vec::with_capacity(n_timesteps);
-            for _ in 0..n_timesteps {
-                outer.push(vec![0.0; n_zones]);
-            }
-            outer
-        };
+        let total = n_timesteps * n_zones;
         Self {
             zone_elevations: Vec::new(),
             zone_fractions: Vec::new(),
-            zone_temp: alloc_2d(),
-            zone_precip: alloc_2d(),
-            snow_pack: alloc_2d(),
-            liquid_water_in_snow: alloc_2d(),
-            snow_melt: alloc_2d(),
-            snow_input: alloc_2d(),
-            soil_moisture: alloc_2d(),
-            recharge: alloc_2d(),
-            actual_et: alloc_2d(),
+            n_timesteps,
+            n_zones,
+            zone_temp: vec![0.0; total],
+            zone_precip: vec![0.0; total],
+            snow_pack: vec![0.0; total],
+            liquid_water_in_snow: vec![0.0; total],
+            snow_melt: vec![0.0; total],
+            snow_input: vec![0.0; total],
+            soil_moisture: vec![0.0; total],
+            recharge: vec![0.0; total],
+            actual_et: vec![0.0; total],
         }
     }
 }

@@ -1,0 +1,4 @@
+# Compile for the host CPU to enable SIMD (NEON on Apple Silicon, AVX on x86).
+# For CI wheel builds, override with CARGO_ENCODED_RUSTFLAGS.
+[build]
+rustflags = ["-C", "target-cpu=native"]

@@ -116,6 +116,31 @@ pub fn convolve_triangular(
     (new_buffer, qsim)
 }
 
+/// Convolve groundwater runoff with triangular unit hydrograph, in place.
+///
+/// Mutates `buffer` directly instead of returning a new array.
+/// Returns qsim (the output for this timestep).
+#[inline]
+pub fn convolve_triangular_inplace(
+    qgw: f64,
+    buffer: &mut [f64; ROUTING_BUFFER_SIZE],
+    weights: &[f64],
+) -> f64 {
+    let qsim = buffer[0];
+
+    // Shift buffer left in place
+    buffer.copy_within(1..ROUTING_BUFFER_SIZE, 0);
+    buffer[ROUTING_BUFFER_SIZE - 1] = 0.0;
+
+    // Add current input contribution using weights
+    let n_weights = weights.len().min(ROUTING_BUFFER_SIZE);
+    for i in 0..n_weights {
+        buffer[i] += qgw * weights[i];
+    }
+
+    qsim
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

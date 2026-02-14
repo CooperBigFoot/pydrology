@@ -60,6 +60,7 @@ pub fn compute_uh_ordinates(x4: f64) -> ([f64; NH], [f64; 2 * NH]) {
 ///
 /// Returns the UH output for this time step (the first element of states before update).
 /// Modifies `states` in place.
+#[inline]
 pub fn convolve_uh(states: &mut [f64], ordinates: &[f64], input: f64) -> f64 {
     let output = states[0];
     let n = states.len();

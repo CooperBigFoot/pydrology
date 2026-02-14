@@ -215,12 +215,11 @@ pub fn run(
 
             let qgw = q0 + q1 + q2;
 
-            let (new_buffer, qsim) =
-                routing::convolve_triangular(qgw, &state.routing_buffer, &uh_weights);
+            let qsim =
+                routing::convolve_triangular_inplace(qgw, &mut state.routing_buffer, &uh_weights);
 
             state.upper_zone = new_suz;
             state.lower_zone = new_slz;
-            state.routing_buffer = new_buffer;
 
             unsafe {
                 outputs.write_unchecked(t, &Fluxes {
@@ -304,15 +303,16 @@ pub fn run(
 
             // Store per-zone outputs
             if let Some(ref mut zo) = zone_outputs {
-                zo.zone_temp[t][zone_idx] = zone_temp;
-                zo.zone_precip[t][zone_idx] = zone_precip;
-                zo.snow_pack[t][zone_idx] = new_sp;
-                zo.liquid_water_in_snow[t][zone_idx] = new_lw;
-                zo.snow_melt[t][zone_idx] = melt;
-                zo.snow_input[t][zone_idx] = snow_input;
-                zo.soil_moisture[t][zone_idx] = new_sm;
-                zo.recharge[t][zone_idx] = recharge;
-                zo.actual_et[t][zone_idx] = et_act;
+                let idx = t * n_zones + zone_idx;
+                zo.zone_temp[idx] = zone_temp;
+                zo.zone_precip[idx] = zone_precip;
+                zo.snow_pack[idx] = new_sp;
+                zo.liquid_water_in_snow[idx] = new_lw;
+                zo.snow_melt[idx] = melt;
+                zo.snow_input[idx] = snow_input;
+                zo.soil_moisture[idx] = new_sm;
+                zo.recharge[idx] = recharge;
+                zo.actual_et[idx] = et_act;
             }
 
             // Aggregate (area-weighted)
@@ -339,12 +339,11 @@ pub fn run(
         let qgw = q0 + q1 + q2;
 
         // Routing
-        let (new_buffer, qsim) =
-            routing::convolve_triangular(qgw, &state.routing_buffer, &uh_weights);
+        let qsim =
+            routing::convolve_triangular_inplace(qgw, &mut state.routing_buffer, &uh_weights);
 
         state.upper_zone = new_suz;
         state.lower_zone = new_slz;
-        state.routing_buffer = new_buffer;
 
         unsafe {
             outputs.write_unchecked(t, &Fluxes {
@@ -427,12 +426,8 @@ pub fn run_from_slices(
     temp: &[f64],
     initial_state: Option<&State>,
 ) -> FluxesTimeseries {
-    assert_eq!(precip.len(), pet.len(), "precip and pet must have the same length");
-    assert_eq!(precip.len(), temp.len(), "precip and temp must have the same length");
-    let forcing: Vec<HBVForcing> = precip.iter().zip(pet).zip(temp)
-        .map(|((&p, &e), &t)| HBVForcing { precip: p, pet: e, temp: t })
-        .collect();
-    HBVLight::run(params, &forcing, initial_state)
+    let (result, _) = run(params, precip, pet, temp, initial_state, 1, None, None, None, None, None);
+    result
 }
 
 #[cfg(test)]
@@ -557,8 +552,8 @@ mod tests {
         assert!(zone_out.is_some());
         let zo = zone_out.unwrap();
         assert_eq!(zo.zone_elevations.len(), 3);
-        assert_eq!(zo.zone_temp.len(), 5);
-        assert_eq!(zo.zone_temp[0].len(), 3);
+        assert_eq!(zo.n_timesteps, 5);
+        assert_eq!(zo.n_zones, 3);
     }
 
     #[test]
@@ -578,11 +573,11 @@ mod tests {
         let zo = zone_out.unwrap();
         for t in 0..3 {
             assert!(
-                zo.zone_temp[t][0] > zo.zone_temp[t][1],
+                zo.zone_temp[t * 3] > zo.zone_temp[t * 3 + 1],
                 "zone 0 should be warmer than zone 1 at t={t}"
             );
             assert!(
-                zo.zone_temp[t][1] > zo.zone_temp[t][2],
+                zo.zone_temp[t * 3 + 1] > zo.zone_temp[t * 3 + 2],
                 "zone 1 should be warmer than zone 2 at t={t}"
             );
         }

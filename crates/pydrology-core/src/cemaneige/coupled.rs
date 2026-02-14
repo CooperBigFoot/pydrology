@@ -63,6 +63,7 @@ pub struct CoupledOutput {
 /// Run a single CemaNeige layer step (inline, no struct overhead).
 ///
 /// Returns (new_layer_state, layer_fluxes).
+#[inline]
 fn cemaneige_layer_step(
     layer_state: &[f64; LAYER_STATE_SIZE],
     ctg: f64,
@@ -255,6 +256,9 @@ pub fn coupled_run(
     let mut gr6j_ts = GR6JFluxesTimeseries::with_len(n);
     // Flat allocation: n_layers per timestep, n timesteps total
     let mut all_layer_fluxes: Vec<LayerFluxes> = Vec::with_capacity(n * n_layers);
+    // SAFETY: We write every element exactly once in the loop below (t * n_layers + i).
+    // LayerFluxes is Copy, so no Drop is needed for uninitialized elements.
+    unsafe { all_layer_fluxes.set_len(n * n_layers); }
 
     for t in 0..n {
 
@@ -308,7 +312,7 @@ pub fn coupled_run(
             agg.temp += fluxes.temp * frac;
             agg.precip += fluxes.precip * frac;
 
-            all_layer_fluxes.push(fluxes);
+            unsafe { *all_layer_fluxes.get_unchecked_mut(t * n_layers + i) = fluxes; }
         }
 
         // Feed aggregated liquid to GR6J

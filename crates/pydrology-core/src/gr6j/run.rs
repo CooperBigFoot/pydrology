@@ -13,6 +13,7 @@ use crate::traits::HydrologicalModel;
 /// Execute one timestep of the GR6J model.
 ///
 /// Takes current state + forcing + precomputed UH ordinates, returns new state + all fluxes.
+#[inline]
 pub fn step(
     state: &State,
     params: &Parameters,

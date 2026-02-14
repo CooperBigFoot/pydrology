@@ -144,33 +144,17 @@ fn hbv_run<'py>(
     if let Some(zo) = zone_outputs {
         dict.set_item("zone_elevations", PyArray1::from_vec(py, zo.zone_elevations))?;
         dict.set_item("zone_fractions", PyArray1::from_vec(py, zo.zone_fractions))?;
-
-        // Convert Vec<Vec<f64>> to 2D: flatten to 1D and store shape
-        let n_timesteps = zo.zone_temp.len();
-        let n_z = if n_timesteps > 0 { zo.zone_temp[0].len() } else { 0 };
-
-        // Helper to flatten 2D Vec<Vec<f64>> to contiguous Vec<f64> (row-major)
-        let flatten_2d = |data: &[Vec<f64>]| -> Vec<f64> {
-            let mut flat = Vec::with_capacity(n_timesteps * n_z);
-            for row in data {
-                debug_assert_eq!(row.len(), n_z, "zone row length mismatch");
-                flat.extend_from_slice(row);
-            }
-            flat
-        };
-
-        // Store as flat arrays with shape info for Python to reshape
-        dict.set_item("zone_n_timesteps", n_timesteps)?;
-        dict.set_item("zone_n_zones", n_z)?;
-        dict.set_item("zone_temp", PyArray1::from_vec(py, flatten_2d(&zo.zone_temp)))?;
-        dict.set_item("zone_precip", PyArray1::from_vec(py, flatten_2d(&zo.zone_precip)))?;
-        dict.set_item("zone_snow_pack", PyArray1::from_vec(py, flatten_2d(&zo.snow_pack)))?;
-        dict.set_item("zone_liquid_water_in_snow", PyArray1::from_vec(py, flatten_2d(&zo.liquid_water_in_snow)))?;
-        dict.set_item("zone_snow_melt", PyArray1::from_vec(py, flatten_2d(&zo.snow_melt)))?;
-        dict.set_item("zone_snow_input", PyArray1::from_vec(py, flatten_2d(&zo.snow_input)))?;
-        dict.set_item("zone_soil_moisture", PyArray1::from_vec(py, flatten_2d(&zo.soil_moisture)))?;
-        dict.set_item("zone_recharge", PyArray1::from_vec(py, flatten_2d(&zo.recharge)))?;
-        dict.set_item("zone_actual_et", PyArray1::from_vec(py, flatten_2d(&zo.actual_et)))?;
+        dict.set_item("zone_n_timesteps", zo.n_timesteps)?;
+        dict.set_item("zone_n_zones", zo.n_zones)?;
+        dict.set_item("zone_temp", PyArray1::from_vec(py, zo.zone_temp))?;
+        dict.set_item("zone_precip", PyArray1::from_vec(py, zo.zone_precip))?;
+        dict.set_item("zone_snow_pack", PyArray1::from_vec(py, zo.snow_pack))?;
+        dict.set_item("zone_liquid_water_in_snow", PyArray1::from_vec(py, zo.liquid_water_in_snow))?;
+        dict.set_item("zone_snow_melt", PyArray1::from_vec(py, zo.snow_melt))?;
+        dict.set_item("zone_snow_input", PyArray1::from_vec(py, zo.snow_input))?;
+        dict.set_item("zone_soil_moisture", PyArray1::from_vec(py, zo.soil_moisture))?;
+        dict.set_item("zone_recharge", PyArray1::from_vec(py, zo.recharge))?;
+        dict.set_item("zone_actual_et", PyArray1::from_vec(py, zo.actual_et))?;
     }
 
     Ok(dict)
